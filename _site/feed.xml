@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en"><generator uri="https://jekyllrb.com/" version="4.2.1">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" hreflang="en" /><updated>2021-09-28T20:53:00-04:00</updated><id>http://localhost:4000/feed.xml</id><title type="html">Concerning Quality</title><subtitle>Made with &lt;b style=&quot;color: #f45;&quot;&gt;&amp;lt;3&lt;/b&gt;</subtitle><author><name>Alex Weisberger</name></author><entry><title type="html">State Space Explosion: the Reason We Can Never Test Software to Perfection</title><link href="http://localhost:4000/state-explosion/" rel="alternate" type="text/html" title="State Space Explosion: the Reason We Can Never Test Software to Perfection" /><published>2021-01-02T00:00:00-05:00</published><updated>2021-01-02T00:00:00-05:00</updated><id>http://localhost:4000/state-explosion</id><content type="html" xml:base="http://localhost:4000/state-explosion/">&lt;p&gt;Have you ever seen a test suite actually prevent 100% of bugs? With all of the time that we spend testing software, how do bugs still get through? Testing seems ostensibly simple – there are only so many branches in the code, only so many buttons in the UI, only so many edge cases to consider. So what is difficult about testing software?&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;This post is dedicated to &lt;a href=&quot;https://en.wikipedia.org/wiki/Edmund_M._Clarke&quot;&gt;Edmund Clarke&lt;/a&gt;, who spent a large portion of his life pioneering solutions to the &lt;a href=&quot;https://www.youtube.com/watch?v=I1lf2MBy3J4&amp;amp;t=1096s&quot;&gt;state explosion problem&lt;/a&gt;.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;h1 id=&quot;state-space-and-the-incomplete-guarantees-of-branch-coverage&quot;&gt;State Space and the Incomplete Guarantees of Branch Coverage&lt;/h1&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Consequently, drawing conclusions about software quality short of testing every possible input to the
+program is fraught with danger.&lt;sup id=&quot;fnref:fn1&quot; role=&quot;doc-noteref&quot;&gt;&lt;a href=&quot;#fn:fn1&quot; class=&quot;footnote&quot; rel=&quot;footnote&quot;&gt;1&lt;/a&gt;&lt;/sup&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;When we think of edge cases, we intuitively think of branches in the code. Take the following trivial example:&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;currentUser&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;User is authenticated&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;User is unauthenticated&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;This single &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;if&lt;/code&gt; statement has only two branches&lt;sup id=&quot;fnref:fn2&quot; role=&quot;doc-noteref&quot;&gt;&lt;a href=&quot;#fn:fn2&quot; class=&quot;footnote&quot; rel=&quot;footnote&quot;&gt;2&lt;/a&gt;&lt;/sup&gt;. If we wanted to test it, we surely need to exercise both and verify that the correct string is returned. I don’t think anyone would have difficulty here, but what if the condition is more complicated?&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;canAccess&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;internal&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;===&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;featureEnabled&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;===&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Here, we could have come up with the following test cases:&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;internal&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;featureEnabled&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;nx&quot;&gt;canAccess&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// ==&amp;gt; false&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;internal&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;featureEnabled&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;nx&quot;&gt;canAccess&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// ==&amp;gt; true&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;This would yield 100% branch coverage, but there’s a subtle bug. The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;internal&lt;/code&gt; flag was supposed to give internal users access to some feature without needing the feature to be explicitly flagged (i.e. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;featureEnabled: true&lt;/code&gt;), but the conditional checks for &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;user.internal === false&lt;/code&gt; instead. This would give access to the feature to all external users, whether or not they had the flag enabled. This is why bugs exist even with 100% branch coverage. While it is useful to know if you have missed a branch during testing, knowing that you’ve tested all branches still does not guarantee that that the code works for all possible inputs.&lt;/p&gt;
+
+&lt;p&gt;For this reason, there are more comprehensive (and tedious) coverage strategies, such as condition coverage. With condition coverage you must test the case where each subcondition of a conditional evaluates to true and false. To do that here, we’d need to construct the following four &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;user&lt;/code&gt; values (true and false for each side of the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;||&lt;/code&gt;):&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;internal&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;featureEnabled&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;internal&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;featureEnabled&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;internal&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;featureEnabled&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;internal&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;featureEnabled&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;If you’re familiar with Boolean or propositional logic, these are simply the input combinations of a truth table for two boolean variables:&lt;/p&gt;
+
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;internal&lt;/th&gt;
+      &lt;th&gt;featureEnabled&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;F&lt;/td&gt;
+      &lt;td&gt;F&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;F&lt;/td&gt;
+      &lt;td&gt;T&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;T&lt;/td&gt;
+      &lt;td&gt;F&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;T&lt;/td&gt;
+      &lt;td&gt;T&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;p&gt;This is tractable for this silly example code because there are only 2 boolean parameters and we can exhaustively test all of their combinations with only 4 test cases. Obviously &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;bools&lt;/code&gt; aren’t the only type of values in programs though, and other types exacerbate the problem because they consist of more possible values. Consider this example:&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kr&quot;&gt;enum&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Role&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;nx&quot;&gt;Admin&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;nx&quot;&gt;Read&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;nx&quot;&gt;ReadWrite&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;canAccess&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;role&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Role&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;role&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;===&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Role&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ReadWrite&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Here, a role of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Admin&lt;/code&gt; or &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ReadWrite&lt;/code&gt; should allow access to some operation, but the code only checks for a role of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ReadWrite&lt;/code&gt;. 100% condition and branch coverage are achieved with 2 test cases (&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Role.ReadWrite&lt;/code&gt; and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Role.Read&lt;/code&gt;), but the function returns the wrong value for &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Role.Admin&lt;/code&gt;. This is a very common bug with enum types – even if exhaustive case matching is enforced, there’s nothing that prevents us from writing an improper mapping in the logic.&lt;/p&gt;
+
+&lt;p&gt;The implications of this are very bad, because data combinations grow combinatorially. If we have a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;User&lt;/code&gt; type that looks like this,&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;User&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;role&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Role&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;internal&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;Boolean&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;flagEnabled&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;Boolean&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;and we know that there are 3 possible &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Role&lt;/code&gt; values and 2 possible &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Boolean&lt;/code&gt; values, there are then 3 * 2 * 2 = 12 possible &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;User&lt;/code&gt; values that we can construct. The set of possible states that a data type can be in is referred to as its state space. A state space of size 12 isn’t so bad, but these multiplications get out of hand very quickly for real-world data models. If we have a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Resource&lt;/code&gt; type that holds the list of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt; that have access to it,&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Resource&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;User&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;it has 4,096 possible states (2^12 elements in the power set of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt;) in its state space. Let’s say we have a function that operates on two &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Resources&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-typescript highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;compareResources&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;resource1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Resource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;resource2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Resource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; 
+  &lt;span class=&quot;p&quot;&gt;...&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The size of the domain of this function is the size of the product of the two &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Resource&lt;/code&gt; state spaces, i.e. 4,096^2 = 16,777,216. That’s around 16 million test cases to exhaustively test the input data. If we are doing integration testing where each test case can take 1 second, this would take ~194 days to execute. If these are unit tests running at 1 per millisecond, that’s still almost 5 hours of linear test time. And that’s not even considering the fact that you physically can’t even write that many tests, so you’d have to generate them somehow.&lt;/p&gt;
+
+&lt;p&gt;This is the ultimate dilemma: testing with exhaustive input data is the only way of knowing that a piece of logic is entirely correct, yet the size of the input data’s state space makes that prohibitively expensive in most cases. So be wary of the false security that coverage metrics provide. Bugs can still slip through if the input state space isn’t sufficiently covered.&lt;/p&gt;
+
+&lt;h1 id=&quot;state-introduces-path-dependence&quot;&gt;State Introduces Path Dependence&lt;/h1&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;All hours wound; the last one kills&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;We’ve only considered pure functions up until now. A stateful, interactive program is more complicated than a pure function. Let’s consider the &lt;a href=&quot;/assets/user-form-app&quot;&gt;following stateful React app&lt;/a&gt;, which I’ve chosen because it has a bug that actually occurred to me in real life&lt;sup id=&quot;fnref:fn4&quot; role=&quot;doc-noteref&quot;&gt;&lt;a href=&quot;#fn:fn4&quot; class=&quot;footnote&quot; rel=&quot;footnote&quot;&gt;3&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-jsx highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nx&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;User&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;string&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;allUsers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;User&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;User 1&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;},&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;User 2&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;searchResults&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;User&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;User 2&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+&lt;span class=&quot;nx&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;UserFormProps&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;User&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[],&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;onSearch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;User&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[])&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;void&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;UserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;onSearch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;UserFormProps&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;div&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;button&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;onClick&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;onSearch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;searchResults&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Search for Users&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;button&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+    &lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;map&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;user&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}))&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;div&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;App&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;showingUserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;setShowingUserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;useState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+  &lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;setUsers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;useState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;allUsers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+  &lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;toggleUserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;setShowingUserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;showingUserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;setUsers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;allUsers&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+  &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;div&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;className&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;App&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+       &lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;button&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;onClick&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;setShowingUserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;showingUserForm&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+          &lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Toggle Form&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;button&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;
+      &lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;showingUserForm&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;nc&quot;&gt;UserForm&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;onSearch&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;setUsers&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;/&amp;gt;&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;div&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+  &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;This app can show and hide a form that allows selecting a set of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt;. It starts out by showing all &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt; but also allows you to search for specific ones. There’s a tiny (but illustrative) bug in this code. Take a minute to try and find it.&lt;/p&gt;
+
+&lt;p&gt;.
+&lt;br /&gt;
+..
+&lt;br /&gt;
+…
+&lt;br /&gt;
+….
+&lt;br /&gt;
+…..
+&lt;br /&gt;
+……
+&lt;br /&gt;
+…….
+&lt;br /&gt;
+……..
+&lt;br /&gt;
+………
+&lt;br /&gt;
+……….
+&lt;br /&gt;&lt;/p&gt;
+
+&lt;p&gt;The bug is exposed with the following sequence of interactions:&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Show the form&lt;/li&gt;
+  &lt;li&gt;Search for a User&lt;/li&gt;
+  &lt;li&gt;Close the form&lt;/li&gt;
+  &lt;li&gt;Open the form again&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;At this point, the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt; that were previously searched for are still displayed in the results list. This is what it looks like after step 4:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/UserResultBug.png&quot; style=&quot;margin: auto; max-width: 45%; padding: 20px; border: 1px solid black&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The bug isn’t tragic, and there’s plenty of simple ways to fix it, but it has a very frustrating implication: we could have toggled the form on and off 15 times, but only after searching and &lt;em&gt;then&lt;/em&gt; toggling the form do we see this bug. Let’s understand how that’s possible.&lt;/p&gt;
+
+&lt;p&gt;A stateful, interactive application such as this is most naturally modeled by a state machine. Let’s look at the state diagram of this application&lt;sup id=&quot;fnref:fn5&quot; role=&quot;doc-noteref&quot;&gt;&lt;a href=&quot;#fn:fn5&quot; class=&quot;footnote&quot; rel=&quot;footnote&quot;&gt;4&lt;/a&gt;&lt;/sup&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/UserFormStateDiagram.png&quot; alt=&quot;&quot; /&gt;
+&lt;img src=&quot;/assets/UserFormStateDiagramLegend.png&quot; style=&quot;margin: auto; max-width: 60%;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;There are 2 state variables in this application: &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;showingForm&lt;/code&gt; represents whether or not the form is showing, and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;users&lt;/code&gt; is the set of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt; that the form is displaying for selection. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;showingForm&lt;/code&gt; can be true or false, and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;users&lt;/code&gt; can be all possible subsets of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt; in the system, which for the purposes of this example we’ve limited to 2. The state space of this application then has 2 * 2^2 = 8 individual states, since we consider each individual combination of values to be a distinct state.&lt;/p&gt;
+
+&lt;p&gt;The edges between the states represent the actions that a user can take. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ToggleForm&lt;/code&gt; means they click the “Toggle Form” button, and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;SearchForUsers&lt;/code&gt; means they clicked the “Search for Users” button. We can observe the above bug directly in the state diagram:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/UserFormStateDiagramTransitionHighlight.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Here we see that we can hide the form after the search returns &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;u2&lt;/code&gt;, and when we show the form again, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;u2&lt;/code&gt; is still the only member of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;users&lt;/code&gt;. Note how if we only show and hide the form and never perform a search, we can never get into this state:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/UserFormStateDiagramNoSearchTransitionHighlight.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The fact that the same user action (&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ToggleForm&lt;/code&gt;) can produce a correct or buggy result depending on the sequence of actions that took place before it means that its behavior is dependent on the path that the user takes through the state machine. This is what is meant by &lt;em&gt;path dependence&lt;/em&gt;, and it is a huge pain from a testing perspective. It means that just because you witnessed something work one time does not mean it will work the next time– we now have to consider sequences of actions when coming up with test cases. If there are n states, that means that there are n^k k-length paths through the state graph. In this extremely simplified application, there are 8 states. Checking for 4-length sequences would require 4,096 test cases, and checking for 8-length sequences would require 16,777,216.&lt;/p&gt;
+
+&lt;p&gt;Checking for all k-length sequences doesn’t even guarantee that we discover all unique paths in the graph– whichever k we test for, the bug could only happen at the k+1th step. The introduction of state brings the notion of time into the program. To perform a sequence of actions, you have to be able to perform an action &lt;em&gt;after&lt;/em&gt; a previous one. These previous actions leave behind an insidious artifact: state. Programmers intuitively know that state is inherently complex, but this is shows where that intuition comes from. Like clockmakers, we know know how powerful the effect of time is, and clockmakers have a saying that’s relevant here:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Omnes vulnerant, ultima necat&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;It means: &lt;em&gt;All hours wound; the last one kills&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;It seems that our collective intuition is correct, and we should try and avoid state and time in programs whenever we can. Path dependence adds a huge burden to testing.&lt;/p&gt;
+
+&lt;h1 id=&quot;state-explosion&quot;&gt;State Explosion&lt;/h1&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Faster, higher, stronger&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;A state graph consists of one node per state in the state space of the state variables, along with directed edges between them. If there are n states in the state space, then there can be n^2 edges in the corresponding state graph&lt;sup id=&quot;fnref:fn6&quot; role=&quot;doc-noteref&quot;&gt;&lt;a href=&quot;#fn:fn6&quot; class=&quot;footnote&quot; rel=&quot;footnote&quot;&gt;5&lt;/a&gt;&lt;/sup&gt;. We looked at the state diagram of this application with 2 users, now here is the state diagram when there are 4 total &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt; (remember, more &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt; means more possible subsets, and every unique combination of data is considered a different state):&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/UserFormStateDiagramFourUsers.svg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The number of nodes went from 8 to 32 states, which means there are 1,024 possible edges now. There are constraints on when you can perform certain actions, so there are a fewer number of edges in this particular graph, though we can see that there are still quite a lot. Trust me, you don’t want to see the graph for 10 &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Users&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;This phenonmenon is known as &lt;em&gt;state explosion&lt;/em&gt;. When we add more state variables, or increase the range of the existing variables, the state space multiplies in size. This adds quadratically more edges and thus more paths to the state graph of the stateful parts of the program, which increases the probability that there is a specific path that we’re not considering when testing.&lt;/p&gt;
+
+&lt;p&gt;The number of individual states and transitions in a modern interactive application is finite and countable, but it’s almost beyond human comprehension at a granular level. Djikstra called software a &lt;a href=&quot;https://www.cs.utexas.edu/users/EWD/transcriptions/EWD10xx/EWD1036.html&quot;&gt;“radical novelty”&lt;/a&gt; for this reason– how are we expected to verify something of this intimidating magnitude?&lt;/p&gt;
+
+&lt;h1 id=&quot;what-does-this-mean-for-testing&quot;&gt;What Does This Mean for Testing?&lt;/h1&gt;
+
+&lt;p&gt;Frankly, it proves that testing software is &lt;strong&gt;inherently&lt;/strong&gt; difficult. Critics of testing software as a practice are quick to point out that each test case provides no guarantee that other test cases will work. This means that, generally, we’re testing an infinitesimal subset of a potentialy huge state space, and any member of the untested part can lead to a bug. This is a situation where the magnitude of the problem is simply not on our side, to the point where it can be disheartening.&lt;/p&gt;
+
+&lt;p&gt;Yet, we have thousands of test cases running on CI multiple times a day, every day, for years at a time. An enormous amount of computational resources are spent running test suites all around the world, but these tests are like holes in swiss cheese – the majority of the state space gets left uncovered. That’s not even considering the effect that test code has on the ability to actually modify our applications. If we’re not dilligent with how we structure our test code, it can make the codebase feel like a cross between a minefield and a tar pit. The predominant testing strategy of today is to create thousands of isolated test cases that test one specific scenario at a time, often referred to as &lt;em&gt;example-based testing&lt;/em&gt;.  While there are proven benefits to testing via individual examples, and after doing it for many years myself, I’ve opened my mind to other approaches.&lt;/p&gt;
+
+&lt;p&gt;The anti-climax here is that I don’t have the silver bullet for this problem, and it doesn’t look like anyone else does either. Among others, we have the formal methods camp who thinks we can prove our way to software quality, and we have the ship-it camp who thinks it’s an intractable problem so we should just reactively fix bugs as they get reported. We have techniques such as generative testing, input space partitioning, equivalence partitioning, boundary analysis, etc. I’m honestly not sure which way is “correct”, but I do believe that a) it is a very large problem (again, just consider how much compute time every day is dedicated to running test suites across all companies), and b) conventional wisdom is mostly ineffective for solving it. I have more stock in the formal methods side, but I think there are things that go way too far such as dependent typing and interactive theorem proving- it can’t take 6 months to ship an average feature, and developer ergonomics are extremely important. I’ll leave the solution discussion there and tackle that in subsequent posts.&lt;/p&gt;
+
+&lt;p&gt;However we approach it, I’m sure that the state space magnitude problem is at the root of what we need to solve to achieve the goal of high software quality.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;div class=&quot;footnotes&quot; role=&quot;doc-endnotes&quot;&gt;
+  &lt;ol&gt;
+    &lt;li id=&quot;fn:fn1&quot; role=&quot;doc-endnote&quot;&gt;
+      &lt;p&gt;&lt;a href=&quot;https://shemesh.larc.nasa.gov/fm/papers/Hayhurst-2001-tm210876-MCDC.pdf&quot;&gt;A Practical Tutorial on Modified Condition / Decision Coverage&lt;/a&gt;, Kelly J. Hayhurst, Dan S. Veerhusen, John J. Chilenski, Leanna K. Rierson. &lt;a href=&quot;#fnref:fn1&quot; class=&quot;reversefootnote&quot; role=&quot;doc-backlink&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+    &lt;li id=&quot;fn:fn2&quot; role=&quot;doc-endnote&quot;&gt;
+      &lt;p&gt;Of course this if statement could be written as a one liner using a ternary, but the branches are written to explicitly show the individual branches in the code. &lt;a href=&quot;#fnref:fn2&quot; class=&quot;reversefootnote&quot; role=&quot;doc-backlink&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+    &lt;li id=&quot;fn:fn4&quot; role=&quot;doc-endnote&quot;&gt;
+      &lt;p&gt;There are ways of avoiding this bug, particularly by changing which component “owns” which part of the state. The actual application that I noticed this bug in was quite a bit larger than this example, and this design made more sense in that context. Inventing example code is hard, and this type of bug does occur often in practice, so I still think this example is worth taking a look at in this form. &lt;a href=&quot;#fnref:fn4&quot; class=&quot;reversefootnote&quot; role=&quot;doc-backlink&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+    &lt;li id=&quot;fn:fn5&quot; role=&quot;doc-endnote&quot;&gt;
+      &lt;p&gt;Produced by modeling &lt;a href=&quot;/assets/UserFormTLASpec.pdf&quot;&gt;this TLA+ specification&lt;/a&gt;. &lt;a href=&quot;#fnref:fn5&quot; class=&quot;reversefootnote&quot; role=&quot;doc-backlink&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+    &lt;li id=&quot;fn:fn6&quot; role=&quot;doc-endnote&quot;&gt;
+      &lt;p&gt;Some state machine designs allow multiple different transitions between the same 2 states, making the state diagram a multigraph. The number of possible edges in a multigraph is larger than n^2 in that case, but still O(n^2). &lt;a href=&quot;#fnref:fn6&quot; class=&quot;reversefootnote&quot; role=&quot;doc-backlink&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+  &lt;/ol&gt;
+&lt;/div&gt;</content><author><name>Alex Weisberger</name></author><category term="testing" /><summary type="html">Have you ever seen a test suite actually prevent 100% of bugs? With all of the time that we spend testing software, how do bugs still get through? Testing seems ostensibly simple – there are only so many branches in the code, only so many buttons in the UI, only so many edge cases to consider. So what is difficult about testing software? This post is dedicated to Edmund Clarke, who spent a large portion of his life pioneering solutions to the state explosion problem.</summary></entry><entry><title type="html">Why Quality?</title><link href="http://localhost:4000/why-quality/" rel="alternate" type="text/html" title="Why Quality?" /><published>2020-12-19T00:00:00-05:00</published><updated>2020-12-19T00:00:00-05:00</updated><id>http://localhost:4000/why-quality</id><content type="html" xml:base="http://localhost:4000/why-quality/">&lt;p&gt;First thing’s first: why should we care about the quality of software?&lt;/p&gt;
+
+&lt;p&gt;Does it matter?&lt;sup id=&quot;fnref:fn1&quot; role=&quot;doc-noteref&quot;&gt;&lt;a href=&quot;#fn:fn1&quot; class=&quot;footnote&quot; rel=&quot;footnote&quot;&gt;1&lt;/a&gt;&lt;/sup&gt; The answer, like all answers, is that it completely depends on the context. Software is vastly diverse, and not all applications require the same level of quality and reliability. The most obvious litmus test is “will people die if the application fails to perform its job?” That isn’t the only dimension to consider, though. For example, people are very sensitive to mistakes made with their money. Our time is precious, our money is earned, and we expect our banking software to work correctly.&lt;/p&gt;
+
+&lt;p&gt;Errors are themselves contextual. If a UI button is mistakenly released with the wrong color, it might not cause outrage in the customerbase or cost the company money. Color can be aesthetic, and while aesthetics are important, they’re fairly easy to fix and generally don’t cause harm when they’re wrong. However, color can also convey semantic meaning. Consider a legend, where color can be used to distinguish between categories. It would be extremely frustrating if a navigation application mistakenly displayed a traffic value as green (low traffic) instead of red (high traffic). Within the same application, a failure to display the correct colors can be totally benign or very disappointing depending on the use case.&lt;/p&gt;
+
+&lt;p&gt;This means that at the highest level, quality is about people, their feelings, and their expectations. There’s no such thing as inherent correctness of software, only the satisfaction of expectations. So quality is much more than just testing, much more than just measured uptime. It is being truly compassionate toward customers by understanding their expectations and ensuring that they are met.&lt;/p&gt;
+
+&lt;p&gt;We should care about software quality if we care about our customers.&lt;/p&gt;
+
+&lt;h2 id=&quot;on-the-importance-of-expectations&quot;&gt;On the Importance of Expectations&lt;/h2&gt;
+
+&lt;p&gt;Commerce and business are founded on expectations. Value is simply the monetary amount that someone is willing to pay to for a particular expectation to be met. Again, that expectation is contextual. When we buy a car, for example, we are perfectly fine with repairing tires and alternators at the expected frequency. We are not fine, however, when we have to make three trips to the mechanic within a month of buying the car.  In the US, we have a term for cars that have more problems than expected. Such a car is called a &lt;em&gt;lemon&lt;/em&gt;, and it’s a big enough problem that we actually have an &lt;a href=&quot;https://en.wikipedia.org/wiki/Lemon_law&quot;&gt;area of legislation&lt;/a&gt; devoted to protecting consumers who have purchased them.&lt;/p&gt;
+
+&lt;p&gt;No one likes getting a lemon.&lt;/p&gt;
+
+&lt;p&gt;To call the meeting of consumer expectations “important” is actually an extreme understatement to me - it’s the sole purpose of a business. Why would someone continue to pay for something that isn’t providing them the value that they expected in return? This is where it gets murky, because a piece of software often performs so many individual functions, and a large percentage of them may in fact work as expected. However, it’s pretty safe to say that some subset of functions does not work in every piece of software. This is just accepted in the industry, as evidenced by the flippancy with how we talk about bugs. Again, that’s not to say that software should be perfect, but I think our collective tolerance for bugs is way too low.&lt;/p&gt;
+
+&lt;p&gt;Here’s a common joke:&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;A mechnical engineer, an electrical engineer, and a software engineer are riding in a car. The car breaks down.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;The mechanical engineer says, “Don’t worry. I’ll pop the hood and take a look at the engine.”&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;The electrical engineer says, “While you do that, I’ll take a look at the battery and wiring.”&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;The software engineer says, “Why don’t we just get out of the car and get in again?”&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;Funny, but unfortunately rooted in truth.&lt;/p&gt;
+
+&lt;p&gt;Maybe the users are ok with “turning it off and on again”&lt;sup id=&quot;fnref:fn2&quot; role=&quot;doc-noteref&quot;&gt;&lt;a href=&quot;#fn:fn2&quot; class=&quot;footnote&quot; rel=&quot;footnote&quot;&gt;2&lt;/a&gt;&lt;/sup&gt;. If so, no problem. But I encounter people all the time who are sitting at work, sighing in frustration at a computer that either keeps crashing or freezes before they’re done checking someone out. Sometimes it’s a performance issue. Sometimes it’s a typo in the code that wasn’t caught. The point is, users of software don’t see it as different than any other product on the planet, they just want it to work. And when they were sold something that doesn’t, that is a violation of their trust.&lt;/p&gt;
+
+&lt;p&gt;There’s two ultimate outcomes when customer expectations aren’t met. First, after they’ve had enough, they simply find a competitor and switch to their product. Broken promises devalue a software product, and it’s only a matter of time before this gets reflected on the balance sheet.&lt;/p&gt;
+
+&lt;p&gt;The second outcome is the one I’m more worried about. There isn’t always a suitable competitor, or sometimes the software is integral to a customers’ business and is too expensive to migrate off of. In this case, the customers feel powerless and grow to resent the product, but they never actually leave. This seems fine in the short term, but in the long term devalues any future product that a company might want to create or any upsells that they’d like to pitch to existing customers.&lt;/p&gt;
+
+&lt;p&gt;Either way, a lack of quality will ultimately affect the earning potential of a company. Beyond that, it wastes an enormous amount of people’s time by promising value that does not get delivered. Because of this, I think managing customer expectations should be the top priority of a software project.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;p&gt;The question of whether or not we should care about software quality depends on our own values as software creators, as well as the expectations of the customers of the product. These are the variables that we should be thinking about when running a project. No matter what, we should understand the customer expecations, because a failure to do so will result in money lost and dissatisfied users in one way or another. As long as people remain at the center of software creation and consumption, quality should be right there with it.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;div class=&quot;footnotes&quot; role=&quot;doc-endnotes&quot;&gt;
+  &lt;ol&gt;
+    &lt;li id=&quot;fn:fn1&quot; role=&quot;doc-endnote&quot;&gt;
+      &lt;p&gt;I definitely think it matters, but it’s a little more complicated than that. &lt;a href=&quot;#fnref:fn1&quot; class=&quot;reversefootnote&quot; role=&quot;doc-backlink&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+    &lt;li id=&quot;fn:fn2&quot; role=&quot;doc-endnote&quot;&gt;
+      &lt;p&gt;As seen on &lt;a href=&quot;https://www.youtube.com/watch?v=p85xwZ_OLX0&quot;&gt;The IT Crowd&lt;/a&gt; &lt;a href=&quot;#fnref:fn2&quot; class=&quot;reversefootnote&quot; role=&quot;doc-backlink&quot;&gt;&amp;#8617;&lt;/a&gt;&lt;/p&gt;
+    &lt;/li&gt;
+  &lt;/ol&gt;
+&lt;/div&gt;</content><author><name>Alex Weisberger</name></author><summary type="html">First thing’s first: why should we care about the quality of software? Does it matter?1 The answer, like all answers, is that it completely depends on the context. Software is vastly diverse, and not all applications require the same level of quality and reliability. The most obvious litmus test is “will people die if the application fails to perform its job?” That isn’t the only dimension to consider, though. For example, people are very sensitive to mistakes made with their money. Our time is precious, our money is earned, and we expect our banking software to work correctly. I definitely think it matters, but it’s a little more complicated than that. &amp;#8617;</summary></entry></feed>
