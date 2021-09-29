@@ -1,0 +1,22 @@
+{
+  "files": {
+    "main.css": "/assets/user-form-app/static/css/main.106baaae.chunk.css",
+    "main.js": "/assets/user-form-app/static/js/main.ec3e90e9.chunk.js",
+    "main.js.map": "/assets/user-form-app/static/js/main.ec3e90e9.chunk.js.map",
+    "runtime-main.js": "/assets/user-form-app/static/js/runtime-main.c6d9e0ad.js",
+    "runtime-main.js.map": "/assets/user-form-app/static/js/runtime-main.c6d9e0ad.js.map",
+    "static/js/2.c0f9e43f.chunk.js": "/assets/user-form-app/static/js/2.c0f9e43f.chunk.js",
+    "static/js/2.c0f9e43f.chunk.js.map": "/assets/user-form-app/static/js/2.c0f9e43f.chunk.js.map",
+    "static/js/3.2cc9bf7c.chunk.js": "/assets/user-form-app/static/js/3.2cc9bf7c.chunk.js",
+    "static/js/3.2cc9bf7c.chunk.js.map": "/assets/user-form-app/static/js/3.2cc9bf7c.chunk.js.map",
+    "index.html": "/assets/user-form-app/index.html",
+    "static/css/main.106baaae.chunk.css.map": "/assets/user-form-app/static/css/main.106baaae.chunk.css.map",
+    "static/js/2.c0f9e43f.chunk.js.LICENSE.txt": "/assets/user-form-app/static/js/2.c0f9e43f.chunk.js.LICENSE.txt"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.c6d9e0ad.js",
+    "static/js/2.c0f9e43f.chunk.js",
+    "static/css/main.106baaae.chunk.css",
+    "static/js/main.ec3e90e9.chunk.js"
+  ]
+}
