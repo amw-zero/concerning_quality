@@ -11,8 +11,6 @@ Many people (myself included) have a nagging sense that quality and complexity a
 
 # Interviewing and the Bowling Game Kata
 
-Remove: $$ e^{i\theta}=\cos(\theta)+i\sin(\theta) $$
-
 I once worked at a company that consistently hired software engineers, and I was in the rotation for conducting interviews. One exercise that we frequently used was the Bowling Game kata, where we walked the candidate through implementing the scoring rules of bowling. It led to surprisingly rich interviews because we added requirements incrementally via introducing new test cases to pass, and what works for the first few edge cases invariably breaks down as more cases get added. It isn't the worst proxy for "everyday" software development - most people aren't bowling experts, and even if they have passing familiarity with the basics of spares and strikes, their solution buckles once we get into the idiosyncracies of the last frame or rolling multiple strikes in a row. It's fairly similar to getting new requirements as a project continues to grow, at least that's the idea.
 
 I've done this particular exercise with on the order of 100 people of various levels of experience, and a pretty undeniable pattern emerged - there's a very distinct turning point in the exercise that people keep hitting. I became fascinated with this turning point, because it happened so extremely predictably that I couldn't help but think that it pointed to some universal truth about program complexity and / or the upper limit on human cognitive ability.
@@ -133,9 +131,49 @@ So, let's first think about our boundaries. We can analyze games where spares oc
 
 Using TLC, the TLA+ model checker, we can produce a state space graph for an algorithm that we specify. The only thing we need to know right now is that a purple rectangle represents an individual state of the program, e.g. one where `totalScore = 2`, `previousRoll = 1` and `spareOccurred = false`. The directed edges represent a transition between states, so a path through the graph represents a single run of the program with a single set of inputs - in our case, a single game of bowling. In its entirety, the graph represents all possible executions of the program, or all possible games of bowling. In our case, we've bounded the number and value of rolls, so we're only considering all possible games of bowling with rolls of only 1, 4, and 6 pins spanning 2 complete frames. This still may be enough to make a fruitful analysis, if we take stock in the [small scope hypothesis](https://en.wikipedia.org/wiki/Alloy_(specification_language)#The_Alloy_Analyzer).
 
-Remove: Hoare logic - yields takeaways?
+First, let's zoom in and look at a portion of the state space of `TenpinStateful`:
 
-Here's the state graph of the `TenpinStateful` algorithm. Let's just look at it zoomed out to get a sense of its shape:
+<div style="display: flex">
+  <img src="/assets/Tenpin143ZoomedIn.png" style=""/> 
+</div>
+
+The way to "read" a state graph like this is to start at the initial state (the fuschia colored one all the way to the left), and follow the arrows along a path. Each arrow represents a call to `tenpin.roll()`, the stateful method that changes the program state with each call. If we follow the straight line from the initial state to the terminal state to the right, we see the state space for the following run of the program, annotated to show the state space changes at each step (disregard the `numRolls` variable since that is just a simple way to bound our model to the desired number of rolls):
+
+~~~
+let tenpin = new TenpinArray();
+
+    // Current state
+    (previousRoll == 0, totalScore == 0, spareOccured == false)
+
+tenpin.roll(4);
+
+    // Current state
+    (previousRoll == 4, totalScore == 4, spareOccured == false)
+
+tenpin.roll(4);
+
+    // Current state
+    (previousRoll == 4, totalScore == 8, spareOccured == false)
+
+tenpin.roll(4);
+
+    // Current state
+    (previousRoll == 4, totalScore == 12, spareOccured == false)
+
+tenpin.roll(6); 
+
+    // Current state
+    (previousRoll == 4, totalScore == 18, spareOccured == true)
+
+tenpin.score();
+
+// 18 - just returns the current value of totalScore
+~~~
+{: .language-typescript}
+
+Try and folow along through each state in the graph for this run of the program to build intuition about how program statements affect the state space. Again, the state graph is showing _all_ possible runs of our bounded model.
+
+With that out of the way, let's look at a zoomed-out image of the entire state space:
 
 <div style="display: flex">
   <img src="/assets/Tenpin143ZoomedOut.png" style="margin: auto; height: 800px;"/> 
@@ -151,15 +189,18 @@ It doesn't look particularly beautiful, but we don't really have a frame of refe
 
 (_State space graph of the `TenpinArray` algorithm_)
 
-Again, please don't try and look at the individual states - we will dive into those next. What we're looking at right now is the overall _structure_ of the state graphs. Sandi Metz calls this the ["squint test"](https://www.youtube.com/watch?v=8bZh5LMaSmE) when applied to code, and her point is that you can just tell when code is complex because the levels of nesting and random long lines jump out immediately when looking at its shape. 
+What we're looking at right now is the overall _structure_ of the state graphs. Sandi Metz calls this the ["squint test"](https://www.youtube.com/watch?v=8bZh5LMaSmE) when applied to code, and her point is that you can just tell when code is complex because the levels of nesting and random long lines jump out immediately when looking at its shape. 
 
-With that in mind, the word I'd use to describe the `TenpinStateful` algorithm's state space is: _tangly_. It looks like a ball of yarn. States can transition to multiple other states, certain states have multiple parents, and transition edges cross over each other like wayward spaghetti. In contrast, the `TenpinArray` state space seems more structured. First of all, it is a tree - every state has a single parent, and there is only one unique path between any two states. A portion of it also appears to be linear - once the algorithm hits a certain point, all of the remaining states progress in a straight line. 
+With that in mind, the immediate word I'd use to describe the `TenpinStateful` algorithm's state space is: _tangly_. It looks like a ball of yarn. States can transition to multiple other states, certain states have multiple parents, and transition edges cross over each other like wayward spaghetti. In contrast, the `TenpinArray` state space seems more structured. First of all, it is a tree - every state has a single parent, and there is only one unique path between any two states. A portion of it also appears to be linear - once the algorithm hits a certain point, all of the remaining states progress in a straight line. When thinking about the implementation, this must be when `tenpin.roll()` is done being called, and `tenpin.score()` begins looping over the rolls and adding up the scores of each frame.
+
+The squint test of the state space, admittedly not the most rigorous of analytical methods, goes to `TenpinArray`. the overall simpler solution based on real-world experience.
+
+That's pretty interesting.
+
+# Modularity, Local Reasoning, and Command Query Separation
 
 A line is the quintessential simple concept. To be creative, you have to be "non-linear," and linear thinking is often labeled pejoratively. In the graph world, I think it's fair to say that the simplest possible directed graph is 1 -> 2 -> 3 -> ... -> n, where the graph progresses in a straight line. 
 
-The squint test of the state space, admittedly not the most rigorous of analytical methods, goes to `TenpinArray`, the overall simpler solution.
-
-This is interesting.
 
 # Reading State Space Graphs
 
@@ -291,3 +332,5 @@ In the first version, there is no separation between the state transitions and t
 Also, in the second, 
 
 After all, this is pretty much the definition of a bug: an unintended data state.
+
+Remove: Hoare logic - yields takeaways?
