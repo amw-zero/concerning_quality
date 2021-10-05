@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>Misspecification: The Blind Spot of Formal Verification | Concerning Quality</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Alex Weisberger">
+<meta name="generator" content="Jekyll v4.2.1">
+<link rel="canonical" href="http://localhost:4000/misspecification/">
+
+<link rel="stylesheet" href="/assets/css/frame.css">
+
+<link rel="alternate" href="/feed.xml" type="application/atom+xml" title="Concerning Quality">
+
+<link rel="stylesheet" href="/assets/katex/katex.min.css">
+<script defer src="/assets/katex/katex.min.js"></script>
+<script defer src="/assets/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.body)"></script>
+
+
+
+
+
+
+
+<header>
+  <a href="/" class="title">Concerning Quality</a>
+  <nav><a href="/" >Home</a></nav>
+
+</header>
+
+<article>
+  <header>
+  <h1><a href="/misspecification/">Misspecification: The Blind Spot of Formal Verification</a></h1><time datetime="2021-10-01T00:00:00-04:00">October 01, 2021</time>
+</header>
+
+  <p>As people, we like to be right, and we also want to avoid the effort of <em>proving</em> that we’re right. So we often resort to logical fallacies to take shortcuts and strong-arm people into believing us. One such logical fallacy is an <a href="https://en.wikipedia.org/wiki/Argument_from_authority">“appeal to authority”</a> - you simply reference someone or thing that is considered to be an expert, and voilá - now you are right!</p>
+
+<p>The reason it’s a logical fallacy is that even smart people make mistakes. Or, even more importantly, smart people can have ill-intent - what better way to use social capital than to convince your followers to buy your new book and pay for your next vacation? That’s why papers should be peer-reviewed. That’s why we reproduce empirical experiments. And that’s why we should always have healthy skepticism and evaluate an argument for ourselves.</p>
+
+<p>Formal verification is often presented as an appeal to authority. This progam was <em>formally verified</em>, so please stop asking me if there are any bugs! Well, there are simply no silver bullets out there, and formal verification is certainly not one of them because of a very serious blind spot: the possibility of misspecification.</p>
+
+<h1 id="specification-and-misspecification">Specification and Misspecification</h1>
+
+<p>Formal verification implicitly means “verification against a specification,” and the difficulty in creating this specification is often overlooked. What if we simply didn’t specify the right thing? I say this all the time: computer programs are friggin complicated, for lack of a better term. Describing all of the subtleties of behavior in a manageable way is Sisyphean - forget one hyper-specific semantic fact, and your description is incorrect, but it can be so subtle that it’s not even noticed until an equally hyper-specific scenario presents itself during real program usage.</p>
+
+<p>Misspecification is the omission or misstatement of an important behavior or property such that a program can be verified to fully meet its spec, but the spec permits undesirable behavior. As said by Donald Knuth:</p>
+
+<blockquote>
+  <p>“Beware of bugs in the above code; I have only proved it correct, not tried it.”</p>
+</blockquote>
+
+<p>But it is simply something we have to acknowledge about the end goal of testing and verification: we can only verify against our knowledge of what the code <em>should</em> do.</p>
+
+<p>We will look at a more realistic example, but to cut to the chase a little quicker, let’s first consider the common example of the specification of a <code class="language-plaintext highlighter-rouge">sort</code> function:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">sort</span><span class="p">(</span><span class="nx">array</span><span class="p">:</span> <span class="kr">number</span><span class="p">[]):</span> <span class="kr">number</span><span class="p">[]</span> <span class="p">{</span>
+  <span class="c1">// ... </span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">sort</code> should:</p>
+<ul>
+  <li>accept an array of numbers</li>
+  <li>return an array of numbers in sorted order</li>
+</ul>
+
+<p>Easy right?!</p>
+
+<p>Well, what if <code class="language-plaintext highlighter-rouge">sort([3,2,1])</code> returns <code class="language-plaintext highlighter-rouge">[1,3]</code>? Is that in conflict with anything about this specification? It is not, and we need to strengthen the spec in order to prevent this:</p>
+
+<p><code class="language-plaintext highlighter-rouge">sort</code> should:</p>
+<ul>
+  <li>accept an array of numbers</li>
+  <li>return an array of numbers in sorted order</li>
+  <li><strong>and the returned array should be a permutation of the input array</strong></li>
+</ul>
+
+<p>Of course the last statement about the permutation is obvious after you see it, and of course it’s impled when we said “return an array of numbers in sorted order.” But “formal” in formal specification and verification isn’t talking about a dress code, it’s referring to the fact that statements must be precise and complete. One misstatement, or in this case, an <em>underspecification</em>, and unsatisfactory program behavior will be reported as “verified.”</p>
+
+<h1 id="misspecified-relational-queries">Misspecified Relational Queries</h1>
+
+<p>Here’s a more realistic example since I think sort functions are silly to analyze.</p>
+
+<p>Ok, so consider a CRM (customer relationship management) application. Specifically in the context of a sales pipeline. The point is to store information related to sales prospects as they move through the pipeline. Well, you are a really big sales organization, and your company may have done deals with other big companies before, but outside of your area. Let’s say you work in the NYC office and you have a lead, and you have no idea that your Tokyo office has done business with this customer in their region. Tokyo might have some useful information about how the deal went through, so shouldn’t our CRM notifiy you of that connection so that you could reach out and potentially close your deal faster?</p>
+
+<p>Since people are generally not used to program specification, let’s start backwards and look at the implementation first:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">alasql</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">"</span><span class="s2">alasql</span><span class="dl">"</span><span class="p">);</span>
+
+<span class="kd">function</span> <span class="nx">initDatabase</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">database</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">alasql</span><span class="p">.</span><span class="nx">Database</span><span class="p">();</span>
+    <span class="nx">database</span><span class="p">.</span><span class="nx">exec</span><span class="p">(</span><span class="dl">"</span><span class="s2">CREATE TABLE deals (id int, customer varchar(128), stage varchar(128))</span><span class="dl">"</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nx">database</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">Stage</span> <span class="o">=</span> <span class="dl">"</span><span class="s2">early</span><span class="dl">"</span> <span class="o">|</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">;</span>
+<span class="kd">type</span> <span class="nx">Customer</span> <span class="o">=</span> <span class="dl">"</span><span class="s2">c1</span><span class="dl">"</span> <span class="o">|</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">;</span>
+
+<span class="kd">type</span> <span class="nx">Deal</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="na">id</span><span class="p">:</span> <span class="kr">number</span><span class="p">,</span>
+    <span class="na">customer</span><span class="p">:</span> <span class="nx">Customer</span><span class="p">,</span>
+    <span class="na">stage</span><span class="p">:</span> <span class="nx">Stage</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nx">CreateDeal</span><span class="p">(</span><span class="nx">deal</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">,</span> <span class="nx">db</span><span class="p">:</span> <span class="kr">any</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">db</span><span class="p">.</span><span class="nx">exec</span><span class="p">(</span><span class="dl">"</span><span class="s2">INSERT INTO deals (?, ? ,?)</span><span class="dl">"</span><span class="p">,</span> <span class="p">[</span><span class="nx">deal</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span> <span class="nx">deal</span><span class="p">.</span><span class="nx">customer</span><span class="p">,</span> <span class="nx">deal</span><span class="p">.</span><span class="nx">stage</span><span class="p">]);</span>
+
+    <span class="k">return</span> <span class="nx">deal</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">d</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">,</span> <span class="nx">db</span><span class="p">:</span> <span class="kr">any</span><span class="p">):</span> <span class="nx">boolean</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">connectedDeals</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">[]</span> <span class="o">=</span> <span class="nx">db</span><span class="p">.</span><span class="nx">exec</span><span class="p">(</span>
+        <span class="dl">"</span><span class="s2">SELECT * FROM deals WHERE customer = ? and stage = 'late'</span><span class="dl">"</span><span class="p">,</span>
+        <span class="p">[</span><span class="nx">d</span><span class="p">.</span><span class="nx">customer</span><span class="p">],</span>
+    <span class="p">);</span>
+
+    <span class="k">return</span> <span class="nx">connectedDeals</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kd">const</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
+
+<span class="kd">const</span> <span class="nx">existingDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c1</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span> <span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
+<span class="kd">const</span> <span class="nx">newDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c1</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
+
+<span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">newDeal</span><span class="p">,</span> <span class="nx">db</span><span class="p">);</span>
+
+<span class="c1">// true - there was an existing late stage deal </span>
+</code></pre></div></div>
+
+<p>For simplicity, we’re using <a href="https://github.com/agershun/alasql"><code class="language-plaintext highlighter-rouge">alasql</code></a>, an in-memory SQL database implementation, because there’s a subtle bug here, and it’s in the SQL queries.</p>
+
+<p>Hopefully it’s clear what the code does based on the description of the feature. We model Deals, Customers, and Stages. We provide a way to create Deals in the database. We then implement <code class="language-plaintext highlighter-rouge">ConnectionExists</code> which performs the logic for our definition of a “connection” with the customer by querying the database for deals of interest - so called “connected Deals.” Let’s then start by relaxing the definition of formal verification a bit, and use what is almost certainly the most common form of it: automated testing. Automated testing is an approximation of proof by exhaustion / case analysis, where we attempt to prove each logical state true, one by one.</p>
+
+<p>Let’s start with these cases:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">testConnectionDoesntExist</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
+
+    <span class="kd">const</span> <span class="nx">newDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">tenant</span><span class="p">:</span> <span class="dl">"</span><span class="s2">t2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">early</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
+    
+    <span class="kd">const</span> <span class="nx">connectionExists</span> <span class="o">=</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">newDeal</span><span class="p">,</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="nx">connectionExists</span> <span class="o">==</span> <span class="kc">false</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nx">testConnectionDoesExist</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
+
+    <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">tenant</span><span class="p">:</span> <span class="dl">"</span><span class="s2">t2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">)</span>
+    <span class="kd">const</span> <span class="nx">newDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">tenant</span><span class="p">:</span> <span class="dl">"</span><span class="s2">t2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="kd">const</span> <span class="nx">connectionExists</span> <span class="o">=</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">newDeal</span><span class="p">,</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="nx">connectionExists</span> <span class="o">==</span> <span class="kc">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">ConnectionExists</code> returns a bool, so it seems sensible to check cases where it returns both true and false. But we notice a problem when playing around with the application in production: if we have no existing Deals with a Customer, and we create a late stage Deal, <code class="language-plaintext highlighter-rouge">ConnectionExists</code> returns <code class="language-plaintext highlighter-rouge">true</code>. We only want to notify of a connection if there was already an existing Deal before creating a new one, so this is undesirable behavior. If we view our test cases as hinting at the program specification, that specification is underspecified so far - it simply fails to address this case. And since we never test every possible case, misspecification often presents itself as missing test cases with missing test cases.</p>
+
+<p>We strengthen the specification by adding another case:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">testOnlyNewDealLateStage</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
+
+    <span class="kd">const</span> <span class="nx">newDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="kd">const</span> <span class="nx">connectionExists</span> <span class="o">=</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">newDeal</span><span class="p">,</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="nx">connectionExists</span> <span class="o">==</span> <span class="kc">false</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>How should we make it pass? Well, our logic checks if there’s at least one Connected Deal (<code class="language-plaintext highlighter-rouge">connectedDeals.length &gt; 0</code>), but here we only have one Deal, so we might be tempted to just check for the presence of more than one Deal:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">d</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">,</span> <span class="nx">db</span><span class="p">:</span> <span class="kr">any</span><span class="p">):</span> <span class="nx">boolean</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">connectedDeals</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">[]</span> <span class="o">=</span> <span class="nx">db</span><span class="p">.</span><span class="nx">exec</span><span class="p">(</span>
+        <span class="dl">"</span><span class="s2">SELECT * FROM deals WHERE customer = ? and stage = 'late'</span><span class="dl">"</span><span class="p">,</span>
+        <span class="p">[</span><span class="nx">d</span><span class="p">.</span><span class="nx">customer</span><span class="p">],</span>
+    <span class="p">);</span>
+
+    <span class="c1">// ** Updated logic **</span>
+    <span class="k">return</span> <span class="nx">connectedDeals</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now all of the tests pass. but we later find out again that we have still underspecified the desired behavior. Consider this case:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">testNewEarlyStageDeal</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
+
+    <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">)</span>
+    <span class="kd">const</span> <span class="nx">newDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">early</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="kd">const</span> <span class="nx">connectionExists</span> <span class="o">=</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">newDeal</span><span class="p">,</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="nx">connectionExists</span> <span class="o">==</span> <span class="kc">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>This should pass, but it does not, because we’re expecting two late-stage Deals now. In this scenario, there is only one. To wrap up, here is the working implementation of <code class="language-plaintext highlighter-rouge">ConnectionExists</code>, reflecting the fact that what we really want is to consider only Deals <em>other</em> than the newly created one when looking for existing connections:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">d</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">,</span> <span class="nx">db</span><span class="p">:</span> <span class="kr">any</span><span class="p">):</span> <span class="nx">boolean</span> <span class="p">{</span>
+    <span class="c1">// Query for Deal other than the one we're looking for a connection on</span>
+    <span class="kd">const</span> <span class="nx">connectedDeals</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">[]</span> <span class="o">=</span> <span class="nx">db</span><span class="p">.</span><span class="nx">exec</span><span class="p">(</span>
+        <span class="dl">"</span><span class="s2">SELECT * FROM deals WHERE customer = ? and stage = 'late' and id != ?</span><span class="dl">"</span><span class="p">,</span>
+        <span class="p">[</span><span class="nx">d</span><span class="p">.</span><span class="nx">customer</span><span class="p">,</span> <span class="nx">d</span><span class="p">.</span><span class="nx">id</span><span class="p">],</span>
+    <span class="p">);</span>
+
+    <span class="c1">// There only needs to be 1 other such Deal for a connection to exist.</span>
+    <span class="k">return</span> <span class="nx">connectedDeals</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h1 id="from-test-cases-to-specification">From Test Cases to Specification</h1>
+
+<p>Test cases describe what the program should do, but only implicitly. A specification describes it explicitly. Here’s a specification of this behavior:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sig Customer {}
+
+abstract sig Stage {}
+one sig Early extends Stage {}
+one sig Late extends Stage {}
+
+sig Deal {
+  customer: Customer,
+  stage: Stage
+}
+
+pred connectionExists(d: Deal) {
+  some prevDeal: Deal | d.customer = prevDeal.customer and prevDeal.stage in Late
+}
+</code></pre></div></div>
+
+<p>This is written in <a href="https://alloytools.org/">Alloy</a>, which most people probably don’t know and I’m not going to do a tutorial in this post (Hillel Wayne has created <a href="https://alloy.readthedocs.io/en/latest/language/signatures.html">good documentation though</a>). Alloy lends itself very nicely to modeling relational data models though, and here’s the gist. This spec defines the data model of the app (<code class="language-plaintext highlighter-rouge">Customer</code>, <code class="language-plaintext highlighter-rouge">Stage</code>, and <code class="language-plaintext highlighter-rouge">Deal</code>), along with the logic for the <code class="language-plaintext highlighter-rouge">connectionExists</code> query. The spec logic can be read as: “A connection exists for a <code class="language-plaintext highlighter-rouge">Deal</code> <code class="language-plaintext highlighter-rouge">d</code> if there exists a previous <code class="language-plaintext highlighter-rouge">Deal</code>, they both have the same <code class="language-plaintext highlighter-rouge">Customer</code>, and the previous <code class="language-plaintext highlighter-rouge">Deal</code> was late stage.</p>
+
+<p>When considering this spec, and the first bug that was noticed, I think this would be the most natural fix:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pred connectionExists(d: Deal) {
+  let existingDeals = Deal - d |
+    some prevDeal: existingDeals | d.customer = prevDeal.customer and prevDeal.stage in Late
+}
+</code></pre></div></div>
+
+<p>Instead of querying all <code class="language-plaintext highlighter-rouge">Deals</code>, we limit the scope to <code class="language-plaintext highlighter-rouge">existingDeals</code> which subtracts the <code class="language-plaintext highlighter-rouge">Deal</code> that we’re inquiring about its connections. More importantly, compare how we address the new knowledge that the newly created deal should be ignored when querying for connected deals. Here’s how we add that knowledge to the “implicit spec” with another test case:</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">testNewEarlyStageDeal</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
+
+    <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">)</span>
+    <span class="kd">const</span> <span class="nx">newDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">early</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="kd">const</span> <span class="nx">connectionExists</span> <span class="o">=</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">newDeal</span><span class="p">,</span> <span class="nx">db</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="nx">connectionExists</span> <span class="o">==</span> <span class="kc">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Nowhere does this test say anything about only consdering the non-new Deals, we just have a bunch of data and an assertion. The behavior is implicit.</p>
+
+<p>But with a formal spec, it is simply a modification of the spec:</p>
+
+<p>One thing I want to call out is, this wasn’t a big investment. Yea, you have to learn Alloy - a language and a corresponding tool. Or, you have to research and pick another specification tool, which are not known for their usability. I can’t deny that. But, this spec is 14 lines of code. The creator of Alloy, Daniel Jackson, often preaches the value of “leightweight formal methods” for this reason. Check out a post by him and some colleages where they <a href="http://aosabook.org/en/500L/the-same-origin-policy.html">model and check various properties about the web’s Same Origin Policy</a>.</p>
+
+<p>Case analysis leads to an implicit specification, with the individual cases displaying specific behavior. Writing a formal specification obviously makes the specification explicit, but it is also a <em>general</em> description of the program. Nothing about writing a formal spec takes away the risk of misspecification, but because it is both explicit and general, it can be a better tool for reasoning about and adapting to it.</p>
+
+<p>With that, here’s a specification of this behavior:</p>
+
+<h1 id="wrapping-up">Wrapping Up</h1>
+
+<p>I just want to stress how many best practices do not address this problem:</p>
+
+<ul>
+  <li>Using a repository pattern to remove the database from unit tests does not catch this</li>
+  <li>Measuring code coverage would not alert you of this</li>
+  <li>Formally proving ahead of time does not prevent this</li>
+</ul>
+
+<p>There is simply no way to deal with this ahead of time, which is the frustrating thing about it, and why we especially need to keep it in the back of our minds. I tried for a while to come up with a property that prevents this ahead of time, but I could never think of anything that didn’t have extreme hindsight bias. If anyone sees anything, please reach out and let me know!</p>
+
+<p>Also, if you ask me, individual test cases should become the assembly language of testing and verification. There’s nothing us from writing targeted test cases for specific, important scenarios, but it is simply way too weak and costly to be our primary verification technique.</p>
+
+<h1 id="fire-and-brimstone">Fire and Brimstone</h1>
+
+<p>So that’s it. We have no hope. Entropy will take its place as the rightful ruler of the computer program universe, and we will slowly but surely devolve into bug-ridden chaos. We are doomed.</p>
+
+<p>Eh, not really. It’s like everything else. We just need to be conscious of it and take hefty phrases like “formal verification” with a grain of salt.</p>
+
+<h1 id="leftover">Leftover</h1>
+
+<p>Example of division by 0 in proof of 1 + 1 = 2 (principle of explosion?)</p>
+
+<p>Like the old South Park business plan:</p>
+
+<p>Phase 3: Profit.</p>
+
+<p>I think formal verification is often used as an appeal to authority. “This software is formally verified. Checkmate.”</p>
+
+<p>Well, like everything else, it’s not that simple. The sel4 OS is formally verified, but they at least temper their results with reality: https://docs.sel4.systems/projects/sel4/frequently-asked-questions.html#does-sel4-have-zero-bugs.</p>
+
+<p>Misspecification is the one error that cannot be tested for. To test for it, we would have to teach a computer how to read minds and / or understand the higher-level goal of an application. It’s also the main flaw of formal specification fand verification, so it’s important to understand.</p>
+
+  
+</article>
+
+
+
+<footer>
+  <div>Made with <b style="color: #f45;">&lt;3</b></div>
+  <nav><a href="mailto:alex.m.weisberger@gmail.com" ><svg aria-label="Mail" class="icon"><use xlink:href="/assets/fontawesome/icons.svg#envelope"></use></svg></a><a href="https://github.com/amw-zero" ><svg aria-label="Github" class="icon"><use xlink:href="/assets/fontawesome/icons.svg#github"></use></svg></a><a href="/feed.xml" ><svg aria-label="Subscribe" class="icon"><use xlink:href="/assets/fontawesome/icons.svg#rss"></use></svg></a></nav>
+
+</footer>
+
+
+</html>
