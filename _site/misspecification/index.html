@@ -230,7 +230,7 @@ assert oppositeStagesRemainConnected {
 
 <p>This says approximately: “For all combinations of 3 different Deals with the same Customer, if 2 of the Deals have opposite stages and one of those has a connection, then so does the other.” To express this property, we modify <code class="language-plaintext highlighter-rouge">connectionExists</code> to take in the set of Deals to check a connection within. This isn’t an obvious property by any means<sup id="fnref:fn1" role="doc-noteref"><a href="#fn:fn1" class="footnote" rel="footnote">1</a></sup>, but it does arise after thinking about the general reason behind our previous design bug. The bug occurred because we improperly reported a connection only for a Late Stage Deal, so it makes sense to come up with a property that relates Deals with different Stages.</p>
 
-<p>Using properties in this way is much, much more robust than test cases, because properties are general. For example, let’s say after the first bug we wrote this test case:</p>
+<p>Using properties in this way is much, much more robust than test cases, because properties are general. For example, here’s the test case we wrote after we encountered the previous bug:</p>
 
 <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">testOnlyNewDealLateStage</span><span class="p">()</span> <span class="p">{</span>
     <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
@@ -243,7 +243,7 @@ assert oppositeStagesRemainConnected {
 <span class="p">}</span>
 </code></pre></div></div>
 
-<p>This test case transcribes the literal scenario where we encountered the bug, so the focus is (as is usual with example-based testing) on a specific scenario. We might be tempted to change the implementation to this:</p>
+<p>This test case transcribes the literal scenario where we encountered the bug, so the focus is (as is usual with example-based testing) on a specific scenario. We might have tried to change the implementation to this at first:</p>
 
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pred connectionExists(d: Deal, Deals: set Deal) {
   #{prevDeal: Deals | d.customer = prevDeal.customer and prevDeal.stage in Late } &gt; 1
@@ -307,6 +307,8 @@ check oppositeStageDealsRemainConnected for 5
 </ul>
 
 <p>There is simply no way to deal with this ahead of time, which is the frustrating thing about it, and why we especially need to keep it in the back of our minds. Overall, misspecification is always a risk, but it’s not a death sentence. By validating specifications with properties and model checking, we can retain many of the benefits while minimizing the risk. The loop continues, because there is no way to prove our properties are sufficient, but we can at least focus on a small set of important properties instead of endless amounts of individual test cases.</p>
+
+<hr />
 
 <div class="footnotes" role="doc-endnotes">
   <ol>

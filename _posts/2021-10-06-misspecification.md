@@ -203,7 +203,7 @@ assert oppositeStagesRemainConnected {
 
 This says approximately: "For all combinations of 3 different Deals with the same Customer, if 2 of the Deals have opposite stages and one of those has a connection, then so does the other." To express this property, we modify `connectionExists` to take in the set of Deals to check a connection within. This isn't an obvious property by any means[^fn1], but it does arise after thinking about the general reason behind our previous design bug. The bug occurred because we improperly reported a connection only for a Late Stage Deal, so it makes sense to come up with a property that relates Deals with different Stages.
 
-Using properties in this way is much, much more robust than test cases, because properties are general. For example, let's say after the first bug we wrote this test case: 
+Using properties in this way is much, much more robust than test cases, because properties are general. For example, here's the test case we wrote after we encountered the previous bug: 
 
 ~~~
 function testOnlyNewDealLateStage() {
@@ -218,7 +218,7 @@ function testOnlyNewDealLateStage() {
 ~~~
 {: .language-typescript}
 
-This test case transcribes the literal scenario where we encountered the bug, so the focus is (as is usual with example-based testing) on a specific scenario. We might be tempted to change the implementation to this:
+This test case transcribes the literal scenario where we encountered the bug, so the focus is (as is usual with example-based testing) on a specific scenario. We might have tried to change the implementation to this at first:
 
 ~~~
 pred connectionExists(d: Deal, Deals: set Deal) {
@@ -282,5 +282,7 @@ Lastly, I just want to stress how many best practices do not address the misspec
 * Using a repository pattern to remove the database from unit tests does nothing to test the actual query logic, which as was shown here can be subtly surprising.
 
 There is simply no way to deal with this ahead of time, which is the frustrating thing about it, and why we especially need to keep it in the back of our minds. Overall, misspecification is always a risk, but it's not a death sentence. By validating specifications with properties and model checking, we can retain many of the benefits while minimizing the risk. The loop continues, because there is no way to prove our properties are sufficient, but we can at least focus on a small set of important properties instead of endless amounts of individual test cases.
+
+<hr>
 
 [^fn1]: It is a property with a [metamorphic relation](https://www.hillelwayne.com/post/metamorphic-testing/) though, which I have been finding are easier to dream up for more "business logic" type behavior
