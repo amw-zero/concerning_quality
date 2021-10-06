@@ -80,9 +80,17 @@
 
 <p>Here’s a more realistic example since I think sort functions are silly to analyze.</p>
 
-<p>Consider a CRM (customer relationship management) application, specifically in the context of a sales pipeline. The point is to store information related to sales prospects as they move through the pipeline. Well, you are a really big sales organization, and your company may have done deals with the same companies that you’re talking to, only outside of your area and office. Let’s say you work in the NYC office and you have a lead, and you have no idea that your Tokyo office has done business with this customer in their region. Tokyo might have some useful information about how the deal went through, so shouldn’t our CRM notifiy you of that connection so that you could reach out and potentially close your deal faster? We also distinguish between “early” and “late” stage deals, because we’d only want to know about deals that actually have some legs to them, not just every prospect that reached out for a brief phone call or free lunch.</p>
+<p>Consider a CRM (customer relationship management) application, specifically in the context of a sales pipeline. The point is to store information related to sales prospects as they move through the pipeline. Let’s say, you are a really big sales organization, and your company may have done deals with the same companies that you’re talking to, only outside of your area and office. Let’s say you work in the NYC office and you have a lead, and you have no idea that your Tokyo office has done business with this customer in their region. Tokyo might have some useful information about how the deal went through - maybe the CEO likes golf, or knitting, or synchronized swimming.</p>
 
-<p>Here’s a specification of this behavior:</p>
+<p>When this scenario is detected, we want our CRM to notify users of this connection so that they could reach out and potentially close their deals faster. We also distinguish between “early” and “late” stage deals, because we’d only want to know about deals that actually have some legs to them, not just every prospect that reached out for a brief phone call or free lunch.</p>
+
+<p>Stated informally, the specification is something along the lines of:</p>
+
+<ul>
+  <li>A Connection exists with a Deal if another Late Stage Deal with the same customer exists</li>
+</ul>
+
+<p>Here’s a formal specification of this behavior:</p>
 
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sig Customer {}
 
@@ -177,7 +185,7 @@ pred connectionExists(d: Deal) {
 <span class="p">}</span>
 </code></pre></div></div>
 
-<p>What we witnessed here was a misspecification. If we look back at the informal description of the feature, it’s pretty clear that we should subtract the subject Deal from the rest of the existing Deals in the system when looking for connections. But that subtle fact was not captured in our first version of the specification, because formally capturing subtlety is hard! There is a quote from Dick Guindon:</p>
+<p>What we witnessed here was a misspecification. If we look back at the informal description of the feature, notice how it says “…if another Deal.” In retrospect it’s pretty clear that we should subtract the subject Deal from the rest of the existing Deals in the system when looking for connections. But that subtle fact was not captured in our first version of the specification, because formally capturing subtlety is hard! There is a quote from Dick Guindon:</p>
 
 <blockquote>
   <p>Writing is nature’s way of letting you know how sloppy your thinking is.</p>
@@ -189,13 +197,17 @@ pred connectionExists(d: Deal) {
   <p>Mathematics is nature’s way of letting you know how sloppy your writing is.</p>
 </blockquote>
 
-<p>It’s not that we didn’t understand the gist of the requirements, it’s that the nature of our brains is to muddle details together and to arrive at conclusions based on fuzzy logic. Formal specifications are not fuzzy, nor can they infer what we mean. They must be precise, literal, and</p>
+<p>In this case, it wasn’t that we didn’t understand the gist of the requirements, but that a subtle aspect of them was lost in translation from the informal to the formal. The nature of our brains is to muddle details together and to arrive at conclusions based on fuzzy logic. Formal specifications are not fuzzy, nor can they infer what we mean, so they must be precise, literal, and complete.</p>
+
+<p>We also actually understood the desired requirements here, what if we don’t even have a firm grasp on that? The converse of this example is also possible, where we perfectly specify behavior that does not meet the user’s needs.</p>
+
+<p>Misspecification is a tricky problem - do we have any mirrors to help us with this blind spot?</p>
 
 <h1 id="the-weakest-link-need-not-break-the-chain">The Weakest Link Need Not Break the Chain</h1>
 
 <p>Knowing about a weakness does not mean that all is lost though. In fact, it strengthens our practice of verification because we can acknowledge that the specification is our linchpin and compensate. If a small misspecification can lead to total system instability, then we had better focus on validating our specs.</p>
 
-<p>A blind spot is only blind if we’re unaware of it.</p>
+<p>A blind spot is only blind if we can’t see it.</p>
 
 <p>I love how <a href="https://ahelwer.ca/post/2018-02-12-formal-verification/">Andrew Helwer puts it</a>, referring to a verified system as a “chain of truth” that “is fundamentally without an anchor.” There is no watcher watching the watchers here, no verification that can be performed on the spec itself. How could an algorithm tell us that we’re saying what we want to say? There are tools here though to help with this, taking advantage of the fact that a specification is often much higher level, more abstract, and more semantically defined than an implementation. For example, we can check a specification for properties, which are much more powerful than test cases because properties operate on the entire set of all program behaviors, rather than the few specific code paths that are exercised with tests.</p>
 
@@ -203,7 +215,8 @@ pred connectionExists(d: Deal) {
 
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pred connectionExists(d: Deal, Deals: set Deal) {
   let ExistingDeals = Deals - d |
-    some prevDeal: ExistingDeals | d.customer = prevDeal.customer and prevDeal.stage in Late
+    some prevDeal: ExistingDeals |
+      d.customer = prevDeal.customer and prevDeal.stage in Late
 }
 
 assert oppositeStagesRemainConnected {
@@ -217,14 +230,7 @@ assert oppositeStagesRemainConnected {
 
 <p>This says approximately: “For all combinations of 3 different Deals with the same Customer, if 2 of the Deals have opposite stages and one of those has a connection, then so does the other.” To express this property, we modify <code class="language-plaintext highlighter-rouge">connectionExists</code> to take in the set of Deals to check a connection within. This isn’t an obvious property by any means<sup id="fnref:fn1" role="doc-noteref"><a href="#fn:fn1" class="footnote" rel="footnote">1</a></sup>, but it does arise after thinking about the general reason behind our previous design bug. The bug occurred because we improperly reported a connection only for a Late Stage Deal, so it makes sense to come up with a property that relates Deals with different Stages.</p>
 
-<p>Using properties in this way is more robust than test cases, because properties are general. For example, let’s say after the first bug we instead tried and change the query logic to this:</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pred connectionExists(d: Deal, Deals: set Deal) {
-  #{prevDeal: Deals | d.customer = prevDeal.customer and prevDeal.stage in Late } &gt; 1
-}
-</code></pre></div></div>
-
-<p>There are test cases that we could have written where this logic would have passed, e.g.:</p>
+<p>Using properties in this way is much, much more robust than test cases, because properties are general. For example, let’s say after the first bug we wrote this test case:</p>
 
 <div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">testOnlyNewDealLateStage</span><span class="p">()</span> <span class="p">{</span>
     <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
@@ -237,7 +243,14 @@ assert oppositeStagesRemainConnected {
 <span class="p">}</span>
 </code></pre></div></div>
 
-<p>This test case transcribes the literal scenario where we encountered the bug, so the focus was (as is usual with example-based testing) on a specific scenario. It won’t catch the bug in the new implementation though. That’s a really common problem with test suites - even with tons and tons of test cases, they don’t actually get at the essence of the requirements, and they suffer from misspecification by underspecification - there just aren’t enough test cases to force a correct implementation.</p>
+<p>This test case transcribes the literal scenario where we encountered the bug, so the focus is (as is usual with example-based testing) on a specific scenario. We might be tempted to change the implementation to this:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pred connectionExists(d: Deal, Deals: set Deal) {
+  #{prevDeal: Deals | d.customer = prevDeal.customer and prevDeal.stage in Late } &gt; 1
+}
+</code></pre></div></div>
+
+<p>Instead of checking for the existence of a single Deal, we check for more than one Deal. We know this isn’t correct logic now, but it’s not always so obvious in the moment, and it’s a common programming reflex to think we have an off-by-one error and just increase the count. This test case does not fail for this new logic though! That’s a really common problem with test suites - even with tons and tons of test cases, they don’t actually get at the essence of the requirements. We can look at a test suite as providing an implicit specification, and a missing test case is equivalent to a misspecification.</p>
 
 <p>When checking the property, however, Alloy can report a counterexample by generating all combinations of input data, up to a configurable bound at least. It quickly finds this counterexample:</p>
 
@@ -245,112 +258,60 @@ assert oppositeStagesRemainConnected {
   <img src="/assets/ConnectionAlloyCounterexample.png" style="" /> 
 </div>
 
-<p>It generated 2 Deals with different Stages that should have connections but don’t because of our faulty implementation.</p>
+<p>It generated 2 Deals with different Stages that should have connections but don’t because of our faulty implementation, and it did it without us writing any explicit test cases or coming up with interesting data states.</p>
 
 <h1 id="wrapping-up">Wrapping Up</h1>
 
 <p>Here’s the full specification plus property check at this point:</p>
 
-<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">sig</span> <span class="nx">Customer</span> <span class="p">{}</span>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sig Customer {}
 
-<span class="kd">abstract</span> <span class="nx">sig</span> <span class="nx">Stage</span> <span class="p">{}</span>
-<span class="nx">one</span> <span class="nx">sig</span> <span class="nx">Early</span> <span class="kd">extends</span> <span class="nx">Stage</span> <span class="p">{}</span>
-<span class="nx">one</span> <span class="nx">sig</span> <span class="nx">Late</span> <span class="kd">extends</span> <span class="nx">Stage</span> <span class="p">{}</span>
+abstract sig Stage {}
+one sig Early extends Stage {}
+one sig Late extends Stage {}
 
-<span class="nx">sig</span> <span class="nx">Deal</span> <span class="p">{</span>
-  <span class="nl">customer</span><span class="p">:</span> <span class="nx">Customer</span><span class="p">,</span>
-  <span class="nx">stage</span><span class="p">:</span> <span class="nx">Stage</span>
-<span class="p">}</span>
+sig Deal {
+  customer: Customer,
+  stage: Stage
+}
 
-<span class="nx">pred</span> <span class="nx">connectionExists</span><span class="p">(</span><span class="nx">d</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">,</span> <span class="nx">Deals</span><span class="p">:</span> <span class="kd">set</span> <span class="nx">Deal</span><span class="p">)</span> <span class="p">{</span>
-  <span class="nx">some</span> <span class="nx">prevDeal</span><span class="p">:</span> <span class="nx">Deals</span> <span class="o">-</span> <span class="nx">d</span> <span class="o">|</span> <span class="nx">d</span><span class="p">.</span><span class="nx">customer</span> <span class="o">=</span> <span class="nx">prevDeal</span><span class="p">.</span><span class="nx">customer</span> <span class="nx">and</span> <span class="nx">prevDeal</span><span class="p">.</span><span class="nx">stage</span> <span class="k">in</span> <span class="nx">Late</span>
-<span class="p">}</span>
+pred connectionExists(d: Deal, Deals: set Deal) {
+  let ExistingDeals = Deals - d |
+    some prevDeal: ExistingDeals |
+      d.customer = prevDeal.customer and prevDeal.stage in Late
+}
 
-<span class="nx">assert</span> <span class="nx">oppositeStageDealsRemainConnected</span> <span class="p">{</span>
-  <span class="nx">all</span> <span class="nx">d</span><span class="p">:</span> <span class="nx">Deal</span><span class="p">,</span> <span class="nx">d</span><span class="dl">'</span><span class="s1">: Deal, d</span><span class="dl">''</span><span class="s1">: Deal | 
-      disjoint[d, d</span><span class="dl">'</span><span class="p">,</span> <span class="nx">d</span><span class="dl">''</span><span class="p">]</span> <span class="nx">and</span>
-      <span class="nx">d</span><span class="p">.</span><span class="nx">customer</span> <span class="o">=</span> <span class="nx">d</span><span class="dl">'</span><span class="s1">.customer and d.customer = d</span><span class="dl">''</span><span class="s1">.customer and
-      d</span><span class="dl">'</span><span class="p">.</span><span class="nx">stage</span> <span class="o">!=</span> <span class="nx">d</span><span class="p">.</span><span class="nx">stage</span> <span class="nx">implies</span> 
-      <span class="nx">connectionExists</span><span class="p">[</span><span class="nx">d</span><span class="p">,</span> <span class="nx">Deal</span> <span class="o">-</span> <span class="nx">d</span><span class="dl">'</span><span class="s1">] implies connectionExists[d</span><span class="dl">'</span><span class="p">,</span> <span class="nx">Deal</span> <span class="o">-</span> <span class="nx">d</span><span class="p">]</span>
-<span class="p">}</span>
+assert oppositeStageDealsRemainConnected {
+  all d: Deal, d': Deal, d'': Deal | 
+    disjoint[d, d', d''] and
+    d.customer = d'.customer and d.customer = d''.customer and
+    d'.stage != d.stage implies 
+      connectionExists[d, Deal - d'] implies connectionExists[d', Deal - d]
+}
  
-<span class="nx">check</span> <span class="nx">oppositeStageDealsRemainConnected</span> <span class="k">for</span> <span class="mi">5</span>
+check oppositeStageDealsRemainConnected for 5
 </code></pre></div></div>
 
 <p>It’s not like this took thousands of lines of test setup code and hundreds of minutes of test time in CI. Specifications plus properties plus model checking have a great cost-to-benefit ratio, with the main benefit being that we get more confidence that we’re avoiding a misspecification as we check properties that we feel accurately describe our problem.</p>
 
 <p>It also does this in 26 milliseconds on my machine, through the dark artistry of SAT solvers.</p>
 
-<p>Misspecification is always a risk, but it’s not a death sentence. By validating specifications with properties and model checking, we can retain many of the benefits while minimizing the risk.</p>
+<p>This is why, if you ask me, individual test cases should become the assembly language of testing and verification. There’s nothing stopping us from writing targeted test cases for specific, important scenarios, but it is simply way too weak and costly to be our primary verification technique.</p>
 
-<p>I just want to stress how many best practices do not address this problem:</p>
+<p>Lastly, I just want to stress how many best practices do not address the misspecification here:</p>
 
 <ul>
-  <li>Using a repository pattern to remove the database from unit tests does not catch this</li>
-  <li>Measuring code coverage would not alert you of this</li>
-  <li>Formally proving ahead of time does not prevent this</li>
+  <li>Measuring code coverage would not alert you of this, it’s easy to get 100% test coverage, especially for queries where all of the logic is within the query itself</li>
+  <li>Formally proving ahead of time does not prevent this - again, our specification itself was incorrect, we would have ended up with a formally verified program that a user would instantly distrust after hitting this scenario</li>
+  <li>Using a repository pattern to remove the database from unit tests does nothing to test the actual query logic, which as was shown here can be subtly surprising.</li>
 </ul>
 
-<p>There is simply no way to deal with this ahead of time, which is the frustrating thing about it, and why we especially need to keep it in the back of our minds. I tried for a while to come up with a property that prevents this ahead of time, but I could never think of anything that didn’t have extreme hindsight bias. If anyone sees anything, please reach out and let me know!</p>
-
-<p>Also, if you ask me, individual test cases should become the assembly language of testing and verification. There’s nothing us from writing targeted test cases for specific, important scenarios, but it is simply way too weak and costly to be our primary verification technique.</p>
-
-<h1 id="fire-and-brimstone">Fire and Brimstone</h1>
-
-<p>So that’s it. We have no hope. Entropy will take its place as the rightful ruler of the computer program universe, and we will slowly but surely devolve into bug-ridden chaos. We are doomed.</p>
-
-<p>Eh, not really. It’s like everything else. We just need to be conscious of it and take hefty phrases like “formal verification” with a grain of salt.</p>
-
-<h1 id="leftover">Leftover</h1>
-
-<p>Example of division by 0 in proof of 1 + 1 = 2 (principle of explosion?)</p>
-
-<p>Like the old South Park business plan:</p>
-
-<p>Phase 3: Profit.</p>
-
-<p>I think formal verification is often used as an appeal to authority. “This software is formally verified. Checkmate.”</p>
-
-<p>Well, like everything else, it’s not that simple. The sel4 OS is formally verified, but they at least temper their results with reality: https://docs.sel4.systems/projects/sel4/frequently-asked-questions.html#does-sel4-have-zero-bugs.</p>
-
-<p>Misspecification is the one error that cannot be tested for. To test for it, we would have to teach a computer how to read minds and / or understand the higher-level goal of an application. It’s also the main flaw of formal specification fand verification, so it’s important to understand.</p>
-
-<p>When considering this spec, and the first bug that was noticed, I think this would be the most natural fix:</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pred connectionExists(d: Deal) {
-  let existingDeals = Deal - d |
-    some prevDeal: existingDeals | d.customer = prevDeal.customer and prevDeal.stage in Late
-}
-</code></pre></div></div>
-
-<p>Instead of querying all <code class="language-plaintext highlighter-rouge">Deals</code>, we limit the scope to <code class="language-plaintext highlighter-rouge">existingDeals</code> which subtracts the <code class="language-plaintext highlighter-rouge">Deal</code> that we’re inquiring about its connections. More importantly, compare how we address the new knowledge that the newly created deal should be ignored when querying for connected deals. Here’s how we add that knowledge to the “implicit spec” with another test case:</p>
-
-<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">testNewEarlyStageDeal</span><span class="p">()</span> <span class="p">{</span>
-    <span class="kd">let</span> <span class="nx">db</span> <span class="o">=</span> <span class="nx">initDatabase</span><span class="p">();</span>
-
-    <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">late</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">)</span>
-    <span class="kd">const</span> <span class="nx">newDeal</span> <span class="o">=</span> <span class="nx">CreateDeal</span><span class="p">({</span> <span class="na">id</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">c2</span><span class="dl">"</span><span class="p">,</span> <span class="na">stage</span><span class="p">:</span> <span class="dl">"</span><span class="s2">early</span><span class="dl">"</span><span class="p">},</span> <span class="nx">db</span><span class="p">);</span>
-
-    <span class="kd">const</span> <span class="nx">connectionExists</span> <span class="o">=</span> <span class="nx">ConnectionExists</span><span class="p">(</span><span class="nx">newDeal</span><span class="p">,</span> <span class="nx">db</span><span class="p">);</span>
-
-    <span class="k">return</span> <span class="nx">connectionExists</span> <span class="o">==</span> <span class="kc">true</span><span class="p">;</span>
-<span class="p">}</span>
-</code></pre></div></div>
-
-<p>Nowhere does this test say anything about only consdering the non-new Deals, we just have a bunch of data and an assertion. The behavior is implicit.</p>
-
-<p>But with a formal spec, it is simply a modification of the spec:</p>
-
-<p>One thing I want to call out is, this wasn’t a big investment. Yea, you have to learn Alloy - a language and a corresponding tool. Or, you have to research and pick another specification tool, which are not known for their usability. I can’t deny that. But, this spec is 14 lines of code. The creator of Alloy, Daniel Jackson, often preaches the value of “leightweight formal methods” for this reason. Check out a post by him and some colleages where they <a href="http://aosabook.org/en/500L/the-same-origin-policy.html">model and check various properties about the web’s Same Origin Policy</a>.</p>
-
-<p>Case analysis leads to an implicit specification, with the individual cases displaying specific behavior. Writing a formal specification obviously makes the specification explicit, but it is also a <em>general</em> description of the program. Nothing about writing a formal spec takes away the risk of misspecification, but because it is both explicit and general, it can be a better tool for reasoning about and adapting to it.</p>
-
-<p>With that, here’s a specification of this behavior:</p>
+<p>There is simply no way to deal with this ahead of time, which is the frustrating thing about it, and why we especially need to keep it in the back of our minds. Overall, misspecification is always a risk, but it’s not a death sentence. By validating specifications with properties and model checking, we can retain many of the benefits while minimizing the risk. The loop continues, because there is no way to prove our properties are sufficient, but we can at least focus on a small set of important properties instead of endless amounts of individual test cases.</p>
 
 <div class="footnotes" role="doc-endnotes">
   <ol>
     <li id="fn:fn1" role="doc-endnote">
-      <p>It is a <a href="https://www.hillelwayne.com/post/metamorphic-testing/">metamorphic property</a> though, which I have been finding are easier to dream up for more “business logic” type behavior <a href="#fnref:fn1" class="reversefootnote" role="doc-backlink">&#8617;</a></p>
+      <p>It is a property with a <a href="https://www.hillelwayne.com/post/metamorphic-testing/">metamorphic relation</a> though, which I have been finding are easier to dream up for more “business logic” type behavior <a href="#fnref:fn1" class="reversefootnote" role="doc-backlink">&#8617;</a></p>
     </li>
   </ol>
 </div>
