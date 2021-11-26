@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 'Refinement: Formalizing the Simplicity Underneath Distributed Programs'
+title: 'Refactoring as Refinement: Formalizing the Simplicity Underneath Distributed Programs'
 tags: formal_verification refinement formal_specification
 author: Alex Weisberger
 ---
