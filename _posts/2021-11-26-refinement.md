@@ -1,15 +1,13 @@
 ---
 layout: post
-title: 'Refactoring as Refinement: Formalizing the Simplicity Underneath Distributed Programs'
+title: 'Refinement: Formalizing the Simplicity Underneath Distributed Programs'
 tags: formal_verification refinement formal_specification
 author: Alex Weisberger
 ---
 
-*Remove refactoring*
-
 "Real world" software is large, messy, and full of detail. A customer might just want to store and retrieve their data, but those simple requirements can get lost in the sea of programming language semantics, libraries, frameworks, databases, Internet protocols, serialization formats, performance optimizations, security hardening, auditability, monitorability, asynchronicity, etc., etc., ad infinitum. We should always try to simplify our stack, but practical computation is optimization to an extent - how would you like to use a logically correct application where each interaction takes 10 seconds to give feedback?
 
-To really understand this difference between functional and non-functional requirements, let's look at two related concepts: refactoring and refinement. These are the fundamental concepts behind behavior-preserving program transformation, but whereas refactoring is informal and intuitive, refinement is formal and verifiable.
+To really understand this difference between functional and non-functional requirements, let's look at the concept of _refinement_. Refinement is the fundamental concept behind behavior-preserving program transformation, and it allows us to separate abstraction from mplementation in formal and verifiable process.
 
 
 # How Product Managers Think About Behavior
@@ -58,11 +56,11 @@ We have an `Order` type, a `BakeryBusiness` class which maintains the state of o
 
 This simple abstract data type captures the activity of the problem domain, but could never be deployed as a real system.
 
-# Refactoring and Refinement
+# Refinement: the Opposite of Abstraction
 
-At some point, we have to actually encode these activities as a deployable application though, and this is where the abstraction level changes. No longer are we only concerned with the abstract nouns and verbs of the problem domain, but we also have to worry about concrete technologies, user experiences, performance, and security. Here's where we need to think about things like relational databases, client-server architecture, and user authentication.
+At some point, we have to actually encode these activities as a deployable application though, and this is where the abstraction level changes. No longer are we only concerned with the abstract nouns and verbs of the problem domain, but we also have to worry about concrete technologies, user experiences, performance, and security. Here's where we need to think about things like relational databases, client-server architecture, and user authentication, etc.
 
-Let's focus on client-server separation to begin with:
+Let's introduce a client-server architecture into our `BakeryBusiness` model:
 
 {% highlight typescript %}
 class BakeryBusinessWithServer {
@@ -90,25 +88,15 @@ bakery.placeOrder({
 
 This new implementation does the same thing: model a customer placing an order to a bakery, but it does so by making a call to a server which performs the actual functionality. This is of course a simplified model of a server, but the basic idea is there: first, the `Order` is serialized then passed to the server. The server deserializes it back into an `Order` where it's then added to the system state.
 
-When the same `placeOrder` call is made, the same result is achieved, but the behavior is carried out internally in a more detailed way than the previous version. [From Wikipedia](https://en.wikipedia.org/wiki/Code_refactoring):
+When the same `placeOrder` call is made, the same result is achieved, but the behavior is carried out internally in a more detailed way than the previous version. We say that `BakeryBusinessWithServer` refines `BakeryBusiness` - it is less abstract.
 
-> ...code refactoring is the process of restructuring existing computer code—changing the factoring—without changing its external behavior.
+In some ways, this is similar to refactoring, but refactoring is [generally concerned with improving the readability or understandability of a program](https://martinfowler.com/bliki/IsOptimizationRefactoring.html). Performance optimizations, for example, may or not be considered refactors, but they are definitely considered refinements. So refactoring and refinement exist along slightly different dimensions.
 
-This is the definition of refactoring, and that's is exactly what's going on here. This version has the same external behavior as the first (at least it seems that way), but its structure has changed - the concept of a server was introduced, for whatever technical reason, and `placeOrder` now talks to it instead of just pushing to a member array directly. This is similar to the well-known [Extract Method](https://refactoring.guru/extract-method) refactoring, but the argument has to be serialized and deserialized since the method in this case represents a separate server process.
+A big difference is how each determines whether or not the behavior is the same between the two program versions. With refactoring, this is done with tests. We can imagine a set of tests that were developed for `BakeryBusiness`, and if they pass for `BakeryBusinessWithServer`, then the refactoring is considered to preserve the behavior. As we know, tests don't actually catch all bugs though, and bugs can especially creep in if the new version is much more complex than the old. Imagine a bug in `JSON.parse` that only occurs when parsing an array containing the number 7 in a nested key, i.e. `{ nested: { key: [7] } }`. The abstract implementation may or may not have tests for this case, so the new implementation might introduce this bug while passing all of the existing tests (a classic example of the [underspecification that test suites provide]({% post_url 2021-10-06-misspecification %})).
 
-How do we actually know that `BakeryBusinessWithServer` truly has the same behavior as `BakeryBusiness` though? What if `JSON.stringify` and `JSON.parse` were functions that we wrote? Do we trust ourselves to have handled all of the intricacies of data serialization properly? Most conversations about refactoring also speak of using tests to ensure that the behavior does in fact stay the same. You can imagine a set of tests that we'd have for the first example. If these tests pass after the refactor, the presumption is that the new implementation didn't change any behavior.
+Refinement, on the other hand, comes with a theory that's mathematically verifiable. The version with the bug in `JSON.parse` could not be considered a refinement of the abstract version because refinement is concerned with all program executions. Even still, the difference is mostly philosophical, as refactors can always be shown to be refinements. Relating the two is important, though, since most people have heard of refactoring, whereas refinement is generally only discussed in the verification community.
 
-As we know, tests don't actually catch all bugs though, and bugs can especially creep in if the new version is much more complex than the old. Imagine a bug in `JSON.parse` that only occurs when parsing an array containing the number 7 in a nested key, i.e. `{ nested: { key: [7] } }`. The abstract implementation may or may not have tests for this case, so the new implementation might introduce this bug while passing all of the existing tests (a classic example of the [underspecification that test suites provide]({% post_url 2021-10-06-misspecification %})).
-
-This is where I want to introduce the concept of refinement.
-
-Refinement is also about code transformation that preserves behavior, but it is generally done because we _want_ to have an abstract specification of a program. This may sound odd, but consider the importance (and utility) of the product manager's view of the system. It is smaller, simpler, and easier to make general statements about. Isn't this view then completely demolished by the technical detail of the actual code? From that angle, it's not so strange to want to keep that view in tact somehow. 
-
-But, instead of eyeballing a transformation or testing it with cases that may or may not catch any error, refinement comes with a theory that's mathematically verifiable. The version with the bug in `JSON.parse` could not be considered a refinement of the abstract version because refinement is concerned with all program executions.
-
-I think almost everyone has heard of refactoring, whereas refinement is something that's only really discussed in the verification community. The ideas are subtly different, but there is also a lot of overlap, the most obvious being that they are both methods of transforming programs while keeping the behavior the same. Refactoring is more concrete, focusing on transformations between working programs. Refinement is a generalization of this, and is able to handle transformations between nondeterministic specifications and working programs. It's also able to handle programs that do _less_ than the program that they are refining, which is probably the biggest distinction.
-
-The most important thing to understand about refinement is that it's meant to mean the opposite of _abstraction_. Something that's abstract might leave out a bunch of details, where a refinement fills in those details while preserving the original idea. In the case of our two bakery models, the first model is the abstraction while the second adds the technical details of a client-server architecture. Refactoring can also be performed to add details
+What I want to stress about refinement is that it is generally done because we _want_ to have an abstract specification of a program. This may sound odd, but consider the importance (and utility) of the product manager's view of the system (`BakeryBusiness`). It is smaller, simpler, and easier to make general statements about. It is also substantially easier to verify properties at this level of abstraction, in contrast to writing endless amounts of test cases at the implementation level. Isn't this view then completely demolished by the technical detail of the actual code? From that angle, it's not so strange to want to keep that view in tact somehow.
 
 # Justifying a Refinement
 
@@ -234,13 +222,13 @@ Refinement is much deeper than proving simple equalities, and generally relies o
 
 # Program Equivalence and Simplicity
 
-My point in introducing and comparing refactoring and refinement is to comment on the perceived complexity of software systems. It seems to me that we often think that systems are fundamentally simple at their core, but somehow we still get bogged down with all of the implementation details in bringing that simple behavior to life. I think the idea of abstraction level can help with this - the essence of the behavior is not the code, but a higher level specification that exists at the level of the problem domain. Refactoring is then a way to transform this specification into an implementation that has an industrial-strength architecture, and refinement provides a better framework for verifying that this transformation is actually correct than conventional testing methods.
+My point in bringing up refinement is to comment on the perceived complexity of software systems. It seems to me that we often think that systems are fundamentally simple at their core, but somehow we still get bogged down with all of the implementation details in bringing that simple behavior to life. I think the idea of abstraction level that refinement provides can help with this - the essence of the behavior is not the code, but a higher level specification that exists at the level of the problem domain. Refinement is then a way to transform this specification into an implementation that has an industrial-strength architecture, providing a framework for verifying that this transformation is actually correct.
 
 When I hear people say "well, this is just a CRUD app," this is what I think is behind that statement. We know that the behavior underlying a multi-process application is simpler than the code that we have to write to support that behavior in the system. The definition of `place_order` is vastly simpler than `place_order_http`, because it is reduced to the essential components in the problem domain, and nothing more. Simply introducing a client-server architecture into this application means we have to think about data serialization, something completely unrelated to bakers, bakeries, or biscuits.
 
 The reason I'm so interested in refinement from this angle is that I believe the conventional methods of achieving this separation of abstraction layers fail us. Things like hexagonal / onion / layered architecture aim to separate high-level behavior from implementation choices, but at the cost of verbose and difficult code. Test suites rarely live up to the promise of supporting radical refactors without modification. Frameworks just mash all of the technical concerns together rather than expose this simple kernel of behavior underneath a complex technical system.
 
-Refinement offers a way to encode the most important part of the system, the abstract specification, and tie it to the final implementation. This offers a new way of thinking about programming methodology that I think is really promising. Of course, it's probably no silver bullet, but there are a growing number of successful case studies using this method such as:
+Refinement offers a way to encode the most important part of the system, the abstract specification, and tie it to the final implementation. This offers a new way of thinking about programming methodology that I think is really promising. Of course, it's no silver bullet, and the effort to fully prove the refinement of an entire system has been shown to be quite large. But there are a growing number of successful case studies using this method such as:
 
 * The aforementioned [sel4 project](https://sel4.systems/). Their whole verification effort is based on refinement of an abstract specification.
 * [Fiat](https://plv.csail.mit.edu/fiat/) which compiles high level specifications to effcient implementations along with a proof of refinement.
@@ -249,6 +237,25 @@ Refinement offers a way to encode the most important part of the system, the abs
 Design patterns and architecture might not be the answer to this problem - actually separating specification and implementation may be the path to a better development experience.
 
 --- 
+
+# Leftover from Refactoring
+
+(*
+This is the definition of refactoring, and that's is exactly what's going on here. This version has the same external behavior as the first (at least it seems that way), but its structure has changed - the concept of a server was introduced, for whatever technical reason, and `placeOrder` now talks to it instead of just pushing to a member array directly. This is similar to the well-known [Extract Method](https://refactoring.guru/extract-method) refactoring, but the argument has to be serialized and deserialized since the method in this case represents a separate server process.*)
+
+How do we actually know that `BakeryBusinessWithServer` truly has the same behavior as `BakeryBusiness` though? What if `JSON.stringify` and `JSON.parse` were functions that we wrote? Do we trust ourselves to have handled all of the intricacies of data serialization properly? Most conversations about refactoring also speak of using tests to ensure that the behavior does in fact stay the same. You can imagine a set of tests that we'd have for the first example. If these tests pass after the refactor, the presumption is that the new implementation didn't change any behavior.
+
+
+
+This is where I want to introduce the concept of refinement.
+
+Refinement is also about code transformation that preserves behavior, 
+
+
+
+I think almost everyone has heard of refactoring, whereas refinement is something that's only really discussed in the verification community. The ideas are subtly different, but there is also a lot of overlap, the most obvious being that they are both methods of transforming programs while keeping the behavior the same. Refactoring is more concrete, focusing on transformations between working programs. Refinement is a generalization of this, and is able to handle transformations between nondeterministic specifications and working programs. It's also able to handle programs that do _less_ than the program that they are refining, which is probably the biggest distinction.
+
+The most important thing to understand about refinement is that it's meant to mean the opposite of _abstraction_. Something that's abstract might leave out a bunch of details, where a refinement fills in those details while preserving the original idea. In the case of our two bakery models, the first model is the abstraction while the second adds the technical details of a client-server architecture. Refactoring can also be performed to add details
 
 # Closing
 
