@@ -1,11 +1,13 @@
 ---
 layout: post
-title: 'Refactoring as Refinement: Formalizing the Simplicity Underneath Distributed Programs'
+title: 'Refinement: Formalizing the Simplicity Underneath Distributed Programs'
 tags: formal_verification refinement formal_specification
 author: Alex Weisberger
 ---
 
-"Real world" software is large, messy, and full of detail. A customer might just want to store and retrieve their data, but those simple requirements can get lost in the sea of programming language semantics, libraries, frameworks, databases, Internet protocols, serialization formats, performance optimizations, security hardening, auditability, monitorability, asynchronicity, etc., etc., ad infinitum. We should always try to simplify our stack, but practical computation is optimization to an extent - how would you like to use a logically correct user interface where each interaction takes 10 seconds to give feedback?
+*Remove refactoring*
+
+"Real world" software is large, messy, and full of detail. A customer might just want to store and retrieve their data, but those simple requirements can get lost in the sea of programming language semantics, libraries, frameworks, databases, Internet protocols, serialization formats, performance optimizations, security hardening, auditability, monitorability, asynchronicity, etc., etc., ad infinitum. We should always try to simplify our stack, but practical computation is optimization to an extent - how would you like to use a logically correct application where each interaction takes 10 seconds to give feedback?
 
 To really understand this difference between functional and non-functional requirements, let's look at two related concepts: refactoring and refinement. These are the fundamental concepts behind behavior-preserving program transformation, but whereas refactoring is informal and intuitive, refinement is formal and verifiable.
 
@@ -20,13 +22,11 @@ Here's an example of something they wouldn't say:
 
 Here's an example of something they would say:
 
-> Bakers are telling us that they keep burning their biscuits while they're on the phone taking people's orders. They want a self-service order platform so they can spend less time on the phone and more time baking. Their customers should be allowed to place and track orders. The bakers want to be able to see their upcoming orders so they can prioritize their work. With this in place, they'll lower their percentage of burnt biscuits (PBB) and they'll have no problem signing up for our service contract.
+> Bakers are telling us that they keep burning their biscuits while they're on the phone taking people's orders. They want a self-service order platform so they can spend less time on the phone and more time baking. If their customers can place and track their own orders, the bakers could see their upcoming orders and prioritize their work with fewer phone calls. With this in place, they'll lower their percentage of burnt biscuits (PBB) and they'll have no problem signing up for our service contract.
 
 PMs think and speak about things that happen in the physical world. In the bakery example, they'd speak of bakers, biscuits, customers, and orders. They'd speak about the process of customers placing orders and how the bakers view and fulfill them. PMs live in the _problem domain_ - the sphere of activity of a particular business, field, or anything that we want to model as a computer program.
 
-At some point, we have to actually encode these activities as a program, and this is where the abstraction level changes. No longer are we only concerned with the abstract nouns and verbs of the problem domain, but we also have to worry about concrete technologies and user experiences. Bakers would never ask for a relational database to solve their problem, but here is where we have to think about it.
-
-Let's make this more concrete with some code. Here's a small subset of  the bakery behavior back at the level of abstraction in the problem domain:
+Let's make this more concrete with some code. Here's a small subset of the bakery behavior at the level of abstraction of the problem domain:
 
 
 {% highlight typescript %}
@@ -56,11 +56,13 @@ bakery.placeOrder({
 
 We have an `Order` type, a `BakeryBusiness` class which maintains the state of orders, and the `placeOrder` method which adds to the current state of `Orders`. There's no user interface, server, database, or anything like that, just some behavior modeled as data and operations on it. A customer placing an order in real life is modeled by instantiating a `BakeryBusiness` and calling the `placeOrder` method on it, as shown.
 
-This is about all that a PM would care about.
+This simple abstract data type captures the activity of the problem domain, but could never be deployed as a real system.
 
 # Refactoring and Refinement
 
-Here is some code that is less abstract, more specific, but providing the same external behavior as the previous example:
+At some point, we have to actually encode these activities as a deployable application though, and this is where the abstraction level changes. No longer are we only concerned with the abstract nouns and verbs of the problem domain, but we also have to worry about concrete technologies, user experiences, performance, and security. Here's where we need to think about things like relational databases, client-server architecture, and user authentication.
+
+Let's focus on client-server separation to begin with:
 
 {% highlight typescript %}
 class BakeryBusinessWithServer {
@@ -86,29 +88,31 @@ bakery.placeOrder({
 });
 {% endhighlight %}
 
-This new implementation does the same thing: model a customer placing an order to a bakery, but it does so by making a call to a server. This is even a simplified model of a server, but the basic idea is there: first, the `Order` is serialized then passed to the server. It's then deserialized back to an `Order` where it's finally added to the system state.
+This new implementation does the same thing: model a customer placing an order to a bakery, but it does so by making a call to a server which performs the actual functionality. This is of course a simplified model of a server, but the basic idea is there: first, the `Order` is serialized then passed to the server. The server deserializes it back into an `Order` where it's then added to the system state.
 
-When the same `placeOrder` call is made, the behavior is carried out internally in a more detailed way than the previous version. [From Wikipedia](https://en.wikipedia.org/wiki/Code_refactoring):
+When the same `placeOrder` call is made, the same result is achieved, but the behavior is carried out internally in a more detailed way than the previous version. [From Wikipedia](https://en.wikipedia.org/wiki/Code_refactoring):
 
 > ...code refactoring is the process of restructuring existing computer code—changing the factoring—without changing its external behavior.
 
-And that's is exactly what's going on here. This version has the same external behavior as the first (at least it seems that way), but its structure has changed - the concept of a server was introduced, for whatever technical reason, `placeOrder` now talks to it instead of just pushing to a member array directly. This is similar to the well-known [Extract Method](https://refactoring.guru/extract-method) refactoring, but the argument has to be serialized and deserialized since the method in this case represents a separate server process.
+This is the definition of refactoring, and that's is exactly what's going on here. This version has the same external behavior as the first (at least it seems that way), but its structure has changed - the concept of a server was introduced, for whatever technical reason, and `placeOrder` now talks to it instead of just pushing to a member array directly. This is similar to the well-known [Extract Method](https://refactoring.guru/extract-method) refactoring, but the argument has to be serialized and deserialized since the method in this case represents a separate server process.
 
-How do we actually know that it has the same behavior as the first though? What if `JSON.stringify` and `JSON.parse` were functions that we wrote? Do we trust ourselves to have handled all of the intricacies of data serialization properly? Most conversations about refactoring also speak of using tests to ensure that the behavior does in fact stay the same. You can imagine a set of tests that we'd have for the first example. If these tests pass after the refactor, the presumption is that the new implementation didn't change any behavior. As we know, tests don't actually catch all bugs though, and bugs can especially creep in if the new version is much more complex than the old. Imagine a bug in `JSON.parse` that only occurs when parsing an array containing the number 7 in a nested key, i.e. `{ nested: { key: [7] } }`. The abstract implementation may or may not have tests for this case, so the new implementation might introduce this bug while passing all of the existing tests.
+How do we actually know that `BakeryBusinessWithServer` truly has the same behavior as `BakeryBusiness` though? What if `JSON.stringify` and `JSON.parse` were functions that we wrote? Do we trust ourselves to have handled all of the intricacies of data serialization properly? Most conversations about refactoring also speak of using tests to ensure that the behavior does in fact stay the same. You can imagine a set of tests that we'd have for the first example. If these tests pass after the refactor, the presumption is that the new implementation didn't change any behavior.
+
+As we know, tests don't actually catch all bugs though, and bugs can especially creep in if the new version is much more complex than the old. Imagine a bug in `JSON.parse` that only occurs when parsing an array containing the number 7 in a nested key, i.e. `{ nested: { key: [7] } }`. The abstract implementation may or may not have tests for this case, so the new implementation might introduce this bug while passing all of the existing tests (a classic example of the [underspecification that test suites provide]({% post_url 2021-10-06-misspecification %})).
 
 This is where I want to introduce the concept of refinement.
 
-Refinement is also about code transformation that preserves behavior, but with subtley different goals than refactoring. Refinement is generally done because we _want_ to have an abstract specification of a program that isn't even necessarily executable. This may sound odd, but consider the importance of the product manager's view of the system. Isn't this view completely demolished by the technical detail of the actual code? From that angle, it's not so strange to want to have a much higher level description of the behaviors of a system. This abstract specification can be used both for communication of the high-level idea as well as for easing the verification effort since it's easier to verify smaller, simpler specifications.
+Refinement is also about code transformation that preserves behavior, but it is generally done because we _want_ to have an abstract specification of a program. This may sound odd, but consider the importance (and utility) of the product manager's view of the system. It is smaller, simpler, and easier to make general statements about. Isn't this view then completely demolished by the technical detail of the actual code? From that angle, it's not so strange to want to keep that view in tact somehow. 
 
-Also, instead of eyeballing a transformation or testing it with cases that may or may not catch any error, refinement comes with a theory that's mathematically verifiable. The version with the bug in `JSON.parse` could not be considered a refinement of the abstract version because refinement is concerned with all program executions.
+But, instead of eyeballing a transformation or testing it with cases that may or may not catch any error, refinement comes with a theory that's mathematically verifiable. The version with the bug in `JSON.parse` could not be considered a refinement of the abstract version because refinement is concerned with all program executions.
 
-A quick detour on the word itself, refinement is meant to mean the opposite of abstraction. Something that's abstract might leave out a bunch of details, where a refinement fills in those details while preserving the original idea. In the case of our two bakery models, the first model is the abstraction while the second adds the technical details of a client-server architecture.
+I think almost everyone has heard of refactoring, whereas refinement is something that's only really discussed in the verification community. The ideas are subtly different, but there is also a lot of overlap, the most obvious being that they are both methods of transforming programs while keeping the behavior the same. Refactoring is more concrete, focusing on transformations between working programs. Refinement is a generalization of this, and is able to handle transformations between nondeterministic specifications and working programs. It's also able to handle programs that do _less_ than the program that they are refining, which is probably the biggest distinction.
 
-I think almost everyone has heard of refactoring, whereas refinement is something that's only really discussed in the verification community. The ideas are subtly different, but there is also a lot of overlap, so presenting them together hopefully provides some more clarity on what each is.
+The most important thing to understand about refinement is that it's meant to mean the opposite of _abstraction_. Something that's abstract might leave out a bunch of details, where a refinement fills in those details while preserving the original idea. In the case of our two bakery models, the first model is the abstraction while the second adds the technical details of a client-server architecture. Refactoring can also be performed to add details
 
 # Justifying a Refinement
 
-Refinement is a whole field unto itself, with the main theory being laid out in the [refinement calculus](https://lara.epfl.ch/w/_media/sav08:backwright98refinementcalculus.pdf). It's way too deep to fully cover, but here is a taste of what it takes to prove a program is a refinement of another.
+Refinement is a whole field unto itself, with the main theory being laid out in the [refinement calculus](https://lara.epfl.ch/w/_media/sav08:backwright98refinementcalculus.pdf). It's way too deep to fully cover, but here is a taste of what it takes to prove that a program is a refinement of another.
 
 There are many ways to prove refinement between two programs, but the simplest to understand is equality - if two programs result in the exact same value for all possible inputs, then one can be seen to refine the other. Let's call our more abstract method for placing orders `place_order`, and let's call our version that uses a server `place_order_http`. In Isabelle/HOL we would express equality of the two functions as a theorem:
 
