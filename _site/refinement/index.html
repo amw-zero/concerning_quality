@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<title>Refinement: Formalizing the Simplicity Underneath Complex Programs | Concerning Quality</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Alex Weisberger">
+<meta name="generator" content="Jekyll v4.2.1">
+<link rel="canonical" href="http://localhost:4000/refinement/">
+
+<link rel="stylesheet" href="/assets/css/frame.css">
+
+<link rel="alternate" href="/feed.xml" type="application/atom+xml" title="Concerning Quality">
+
+<link rel="stylesheet" href="/assets/katex/katex.min.css">
+<script defer src="/assets/katex/katex.min.js"></script>
+<script defer src="/assets/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.body)"></script>
+
+
+
+
+
+
+
+<header>
+  <a href="/" class="title">Concerning Quality</a>
+  <nav><a href="/" >Home</a></nav>
+
+</header>
+
+<article>
+  <header>
+  <h1><a href="/refinement/">Refinement: Formalizing the Simplicity Underneath Complex Programs</a></h1><time datetime="2021-11-26T00:00:00-05:00">November 26, 2021</time>
+</header>
+
+  <p>“Real world” software is large, messy, and full of detail. A customer might just want to store and retrieve their data, but those simple requirements can get lost in the sea of programming language semantics, libraries, frameworks, databases, Internet protocols, serialization formats, performance optimizations, security hardening, auditability, monitorability, asynchronicity, etc., etc., ad infinitum. We should always try to simplify our stack, but practical computation is optimization to an extent - how would you like to use a logically correct application where each interaction takes 10 seconds to give feedback?</p>
+
+<p>To really understand this difference between functional and non-functional requirements, let’s look at the concept of <em>refinement</em>. Refinement is the fundamental concept behind behavior-preserving program transformation, and it allows us to separate abstraction from implementation in a formal and verifiable process.</p>
+
+<h1 id="how-product-managers-think-about-behavior">How Product Managers Think About Behavior</h1>
+
+<p>Let’s first think about behavior at a high level. Remember - <a href="/why-quality/">quality does not exist in a vacuum</a>, and paying customers care little about a verified system that doesn’t do what they want. This is why a good product manager is part psychotherapist, first extracting the customer’s mindset before jumping into solutioning. So given that their primary concern is what a human being wants out of a system, how do they talk and think about behavior?</p>
+
+<p>Here’s an example of something they wouldn’t say:</p>
+
+<blockquote>
+  <p>To meet our customers’ requirements, we’re going to need to start with a microservice architecture communicating with gRPC over HTTP. We know that won’t be good enough, so we’ll also introduce a fanout-on-write pipeline to populate precomputed data in Redis. Of course, they also require a single-page application, so we’ll need an API gateway for a React app to call that proxies requests to the appropriate services. With this in place, the customer will be able to run their baking business on our app.</p>
+</blockquote>
+
+<p>Here’s an example of something they would say:</p>
+
+<blockquote>
+  <p>Bakers are telling us that they keep burning their biscuits while they’re on the phone taking people’s orders. They want a self-service order platform so they can spend less time on the phone and more time baking. If their customers can place and track their own orders, the bakers could see their upcoming orders and prioritize their work with fewer phone calls. With this in place, they’ll lower their percentage of burnt biscuits (PBB) and they’ll have no problem signing up for our service contract.</p>
+</blockquote>
+
+<p>PMs think and speak about things that happen in the physical world. In the bakery example, they’d speak of bakers, biscuits, customers, and orders. They’d speak about the process of customers placing orders and how the bakers view and fulfill them. PMs live in the <em>problem domain</em> - the sphere of activity of a particular business, field, or anything that we want to model as a computer program.</p>
+
+<p>Let’s make this more concrete with some code. Here’s a small subset of the bakery behavior at the level of abstraction of the problem domain:</p>
+
+<figure class="highlight"><pre><code class="language-typescript" data-lang="typescript"><span class="kd">type</span> <span class="nx">Order</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="na">customer</span><span class="p">:</span> <span class="kr">string</span><span class="p">,</span>
+  <span class="na">amount</span><span class="p">:</span> <span class="kr">number</span><span class="p">,</span>
+  <span class="na">sku</span><span class="p">:</span> <span class="kr">string</span><span class="p">,</span>
+  <span class="na">dueBy</span><span class="p">:</span> <span class="nb">Date</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="kd">class</span> <span class="nx">BakeryBusiness</span> <span class="p">{</span>
+    <span class="nl">orders</span><span class="p">:</span> <span class="nx">Order</span><span class="p">[]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="nx">placeOrder</span><span class="p">(</span><span class="nx">order</span><span class="p">:</span> <span class="nx">Order</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">order</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">let</span> <span class="nx">bakery</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">BakeryBusiness</span><span class="p">();</span>
+<span class="nx">bakery</span><span class="p">.</span><span class="nx">placeOrder</span><span class="p">({</span>
+    <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">Biscuit Buyer</span><span class="dl">"</span><span class="p">,</span>
+    <span class="na">amount</span><span class="p">:</span> <span class="mf">10.00</span><span class="p">,</span>
+    <span class="na">sku</span><span class="p">:</span> <span class="dl">"</span><span class="s2">b123</span><span class="dl">"</span><span class="p">,</span>
+    <span class="na">dueBy</span><span class="p">:</span> <span class="k">new</span> <span class="nb">Date</span><span class="p">(</span><span class="dl">"</span><span class="s2">July 8th, 2021</span><span class="dl">"</span><span class="p">),</span>
+<span class="p">});</span></code></pre></figure>
+
+<p>We have an <code class="language-plaintext highlighter-rouge">Order</code> type, a <code class="language-plaintext highlighter-rouge">BakeryBusiness</code> class which maintains the state of orders, and the <code class="language-plaintext highlighter-rouge">placeOrder</code> method which adds to the current state of <code class="language-plaintext highlighter-rouge">Orders</code>. There’s no user interface, server, database, or anything like that, just some behavior modeled as data and operations on it. A customer placing an order in real life is modeled by instantiating a <code class="language-plaintext highlighter-rouge">BakeryBusiness</code> and calling the <code class="language-plaintext highlighter-rouge">placeOrder</code> method on it, as shown.</p>
+
+<p>This simple abstract data type captures the activity of the problem domain. It’s still described in a programming language, but could never be deployed as a real system because it lacks too many details necessary for a modern, interactive program to function.</p>
+
+<h1 id="refinement-the-opposite-of-abstraction">Refinement: the Opposite of Abstraction</h1>
+
+<p>At some point, we have to actually encode these activities as a deployable application though, and this is where the abstraction level changes. No longer are we only concerned with the nouns and verbs of the problem domain, but we also have to worry about concrete technologies, user experiences, performance, and security. Here’s where we need to think about things like relational databases, client-server architecture, and user authentication, etc.</p>
+
+<p>Let’s introduce a client-server architecture into our <code class="language-plaintext highlighter-rouge">BakeryBusiness</code> model:</p>
+
+<figure class="highlight"><pre><code class="language-typescript" data-lang="typescript"><span class="kd">class</span> <span class="nx">BakeryBusinessWithServer</span> <span class="p">{</span>
+    <span class="nl">orders</span><span class="p">:</span> <span class="nx">Order</span><span class="p">[]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="nx">placeOrder</span><span class="p">(</span><span class="nx">order</span><span class="p">:</span> <span class="nx">Order</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kd">const</span> <span class="nx">serializedOrder</span> <span class="o">=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">order</span><span class="p">);</span>
+        <span class="k">this</span><span class="p">.</span><span class="nx">server</span><span class="p">(</span><span class="nx">serializedOrder</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="nx">server</span><span class="p">(</span><span class="nx">data</span><span class="p">:</span> <span class="kr">string</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kd">const</span> <span class="nx">order</span> <span class="o">=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span><span class="p">(</span><span class="nx">data</span><span class="p">);</span>
+        <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">order</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">let</span> <span class="nx">bakery</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">BakeryBusinessWithServer</span><span class="p">();</span>
+<span class="nx">bakery</span><span class="p">.</span><span class="nx">placeOrder</span><span class="p">({</span>
+    <span class="na">customer</span><span class="p">:</span> <span class="dl">"</span><span class="s2">Biscuit Buyer</span><span class="dl">"</span><span class="p">,</span>
+    <span class="na">amount</span><span class="p">:</span> <span class="mf">10.00</span><span class="p">,</span>
+    <span class="na">sku</span><span class="p">:</span> <span class="dl">"</span><span class="s2">b123</span><span class="dl">"</span><span class="p">,</span>
+    <span class="na">dueBy</span><span class="p">:</span> <span class="k">new</span> <span class="nb">Date</span><span class="p">(</span><span class="dl">"</span><span class="s2">July 8th, 2021</span><span class="dl">"</span><span class="p">),</span>
+<span class="p">});</span></code></pre></figure>
+
+<p>This new implementation does the same thing: model a customer placing an order to a bakery, but it does so by making a call to a server which performs the actual functionality. This is of course a simplified model of a server, but the basic idea is there: first, the <code class="language-plaintext highlighter-rouge">Order</code> is serialized then passed to the server. The server deserializes it back into an <code class="language-plaintext highlighter-rouge">Order</code> where it’s then added to the system state.</p>
+
+<p>When the same <code class="language-plaintext highlighter-rouge">placeOrder</code> call is made, the same result is achieved (at least it seems that way by inspection), but the behavior is carried out internally in a more detailed way than the previous version. We say that <code class="language-plaintext highlighter-rouge">BakeryBusinessWithServer</code> <em>refines</em> <code class="language-plaintext highlighter-rouge">BakeryBusiness</code>. Refinement means going from more to less abstract, or from less to more specific. <code class="language-plaintext highlighter-rouge">BakeryBusiness</code> has hardly any detail, being just raw data and operations. Placing an order via <code class="language-plaintext highlighter-rouge">BakeryBusinessWithServer</code> results in the same ultimate state, but introduces the more specific functionality of calling a server.</p>
+
+<p>In some ways, this is similar to refactoring, but refactoring is <a href="https://martinfowler.com/bliki/IsOptimizationRefactoring.html">generally concerned with improving the readability or understandability of a program</a>. Performance optimizations, for example, may or may not be considered refactors, but they are definitely considered refinements. So refactoring and refinement exist along slightly different dimensions.</p>
+
+<p>A big difference is how each determines whether or not the behavior is the same between the two program versions. With refactoring, this is done with tests. We can imagine a set of tests that were developed for <code class="language-plaintext highlighter-rouge">BakeryBusiness</code>, and if they pass for <code class="language-plaintext highlighter-rouge">BakeryBusinessWithServer</code>, then the refactoring is considered to preserve the behavior. As we know, tests don’t actually catch all bugs though, and bugs can especially creep in if the new version is much more complex than the old. Imagine a bug in <code class="language-plaintext highlighter-rouge">JSON.parse</code> that only occurs when parsing an array containing the number 7 in a nested key, i.e. <code class="language-plaintext highlighter-rouge">{ nested: { key: [7] } }</code>. The abstract implementation may or may not have tests for this case, so the new implementation might introduce this bug while passing all of the existing tests (a classic example of the <a href="/misspecification/">underspecification that test suites provide</a>).</p>
+
+<p>Refinement, on the other hand, comes with a theory that’s mathematically verifiable. The version with the bug in <code class="language-plaintext highlighter-rouge">JSON.parse</code> could not be considered a refinement of the abstract version because refinement is concerned with all program executions. Even still, the difference is mostly philosophical, as (correct) refactors can always be shown to be refinements. Relating the two is convenient since most people have heard of refactoring, whereas refinement is generally only discussed in the verification community.</p>
+
+<p>What I want to stress about refinement is that it is generally done because we <em>want</em> to have an abstract specification of a program. This may sound odd, but consider the importance and potential utility of the product manager’s view of the system (<code class="language-plaintext highlighter-rouge">BakeryBusiness</code>). It is smaller, simpler, and easier to make general statements about. It is also substantially easier to verify properties at this level of abstraction. Isn’t this view then completely demolished by the technical detail of the actual code? We then have to resort to writing endless amounts of test cases at the implementation level. From that angle, it’s not so strange to want to keep that view in tact and instead prove that the implementation refines it.</p>
+
+<h1 id="justifying-a-refinement">Justifying a Refinement</h1>
+
+<p>Refinement is a whole field unto itself, with the main theory being laid out in the <a href="https://lara.epfl.ch/w/_media/sav08:backwright98refinementcalculus.pdf">refinement calculus</a>. It’s way too deep to fully cover, but here is a taste of what it takes to prove that a program is a refinement of another.</p>
+
+<p>There are many ways to prove refinement between two programs, but the simplest to understand is equality - if two programs result in the exact same value for all possible inputs, then one can be seen to refine the other. Let’s call our more abstract method for placing orders <code class="language-plaintext highlighter-rouge">place_order</code>, and let’s call our version that uses a server <code class="language-plaintext highlighter-rouge">place_order_http</code>. In Isabelle/HOL, which for the most part resembles other functional programming languages, we would express equality of the two functions as a theorem:</p>
+
+<figure class="highlight"><pre><code class="language-isabelle" data-lang="isabelle">theorem "place_order_http orders order = place_order orders order"</code></pre></figure>
+
+<p><code class="language-plaintext highlighter-rouge">orders</code> is the state of <code class="language-plaintext highlighter-rouge">Orders</code> in the system (corresponding to <code class="language-plaintext highlighter-rouge">bakery.orders</code> in the TS example), and <code class="language-plaintext highlighter-rouge">order</code> is the new <code class="language-plaintext highlighter-rouge">Order</code> being placed. The fact that their values aren’t specified means this theorem must hold for all possible values in order for it to be true.</p>
+
+<p>Let’s first introduce the abstract implementation:</p>
+
+<figure class="highlight"><pre><code class="language-isabelle" data-lang="isabelle">record order =
+  amount :: nat
+
+type_synonym orders = "order set"
+
+fun place_order :: "orders ⇒ order ⇒ orders" where
+"place_order os order = insert order os"</code></pre></figure>
+
+<p>We introduce the <code class="language-plaintext highlighter-rouge">order</code> type as a record with just an <code class="language-plaintext highlighter-rouge">amount</code> field for simplicity, and we define the <code class="language-plaintext highlighter-rouge">place_order</code> function as simply inserting an <code class="language-plaintext highlighter-rouge">order</code> into the passed in state of all <code class="language-plaintext highlighter-rouge">orders</code>. Note how simple this is.</p>
+
+<p>Let’s now introduce the version that calls to a server, serializing before the call and deserializing after. Note - we implement the serialization and deserialization of the number here to illustrate that we need to know about these implementations to complete the proof:</p>
+
+<figure class="highlight"><pre><code class="language-isabelle" data-lang="isabelle">type_synonym http_data = string
+
+fun digit_list :: "nat ⇒ nat list" where
+"digit_list 0 = []" |
+"digit_list n = n mod 10 # digit_list (n div 10)"
+
+definition string_of_nat :: "nat ⇒ string" where
+"string_of_nat n = map char_of (digit_list n)"
+
+fun nat_of_string :: "string ⇒ nat" where
+"nat_of_string [] = 0" |
+"nat_of_string (d # ds) = (of_char d) + 10 * (nat_of_string ds)"
+
+definition deserialize :: "http_data ⇒ order" where
+"deserialize d = ⦇ amount = (nat_of_string d) ⦈"
+
+definition serialize :: "order ⇒ http_data" where
+"serialize ord = string_of_nat (amount ord)"
+
+definition http_server :: "http_data ⇒ orders ⇒ orders" where
+"http_server d os = place_order os (deserialize d)"
+  
+definition place_order_http :: "orders ⇒ order ⇒ orders" where
+"place_order_http os order = http_server (serialize order) os"</code></pre></figure>
+
+<p>Now, we have both <code class="language-plaintext highlighter-rouge">place_order</code> and <code class="language-plaintext highlighter-rouge">place_order_http</code> defined. Aside from the implementation of <code class="language-plaintext highlighter-rouge">nat_of_string</code> and <code class="language-plaintext highlighter-rouge">string_of_nat</code> for serialization purposes, this is a pretty straighforward translation from the Typescript version.</p>
+
+<p>Now, here is the proof for our desired theorem, using an intermediate lemma:</p>
+
+<figure class="highlight"><pre><code class="language-isabelle" data-lang="isabelle">lemma ser_deser[simp]: "nat_of_string (string_of_nat n) = n"
+  apply(induction n rule: digit_list.induct)
+   apply(auto simp: string_of_nat_def)
+  done
+
+theorem "place_order_http os order = place_order os order"
+  apply(cases order)
+   apply(simp add: serialize_def deserialize_def http_server_def place_order_http_def)
+  done</code></pre></figure>
+
+<p>Isabelle considers this proof sufficient, and we can now say that we’ve proven what seemed intuitively obvious: pushing an <code class="language-plaintext highlighter-rouge">Order</code> into an in-memory list has the same external behavior as calling an HTTP server which does it after deserializing the serialized data sent to it. This is true of all possible program executions though - a test case cannot be constructed that results in this equality not holding, and that’s a great assurance.</p>
+
+<p>More importantly (for the topic of this post) is that we now have the simpler <code class="language-plaintext highlighter-rouge">place_order</code> function as a living artifact, instead of being hidden or implicit in the implementation level code. Should we want to prove anything about the system, we could do it on this version and be sure that it also holds for the implementation.</p>
+
+<p>Here’s the full example:</p>
+
+<figure class="highlight"><pre><code class="language-isabelle" data-lang="isabelle">record order =
+  amount :: nat
+
+type_synonym orders = "order set"
+
+fun place_order :: "orders ⇒ order ⇒ orders" where
+"place_order os order = insert order os"
+
+type_synonym http_data = string
+
+fun digit_list :: "nat ⇒ nat list" where
+"digit_list 0 = []" |
+"digit_list n = n mod 10 # digit_list (n div 10)"
+
+definition string_of_nat :: "nat ⇒ string" where
+"string_of_nat n = map char_of (digit_list n)"
+
+fun nat_of_string :: "string ⇒ nat" where
+"nat_of_string [] = 0" |
+"nat_of_string (d # ds) = (of_char d) + 10 * (nat_of_string ds)"
+
+definition deserialize :: "http_data ⇒ order" where
+"deserialize d = ⦇ amount = (nat_of_string d) ⦈"
+
+definition serialize :: "order ⇒ http_data" where
+"serialize ord = string_of_nat (amount ord)"
+
+definition http_server :: "http_data ⇒ orders ⇒ orders" where
+"http_server d os = place_order os (deserialize d)"
+  
+definition place_order_http :: "orders ⇒ order ⇒ orders" where
+"place_order_http os order = http_server (serialize order) os"
+
+lemma ser_deser[simp]: "nat_of_string (string_of_nat n) = n"
+  apply(induction n rule: digit_list.induct)
+   apply(auto simp: string_of_nat_def)
+  done
+ 
+theorem "place_order_http os order = place_order os order"
+  apply(cases order)
+   apply(simp add: serialize_def deserialize_def http_server_def place_order_http_def)
+  done</code></pre></figure>
+
+<p>Refinement can be much more involved than proving simple equalities like this. You can read more about a practical example of a refinement proof in the <a href="http://isabelle.informatik.tu-muenchen.de/~kleing/papers/klein_sw_10.pdf">paper about refinement in the sel4 OS implementation</a>. This example is fine for our purposes of introducing refinement though, and hopefully illustrates the idea.</p>
+
+<h1 id="program-equivalence-and-simplicity">Program Equivalence and Simplicity</h1>
+
+<p>My point in bringing up refinement is to comment on the perceived complexity of software systems. It seems to me that we often think that systems are fundamentally simple at their core, but somehow we still get bogged down with all of the implementation details in bringing that simple behavior to life. I think the idea of abstraction level that refinement provides can help with this - the essence of the behavior is not the code, but a higher level specification that exists at the level of the problem domain. Refinement is then a way to transform this specification into an implementation that has an industrial-strength architecture, providing a framework for verifying that this transformation is actually correct.</p>
+
+<p>When I hear people say “well, this is just a CRUD app,” this is what I think is behind that statement. We know that the behavior underlying a multi-process application is simpler than the code that we have to write to support that behavior. The definition of <code class="language-plaintext highlighter-rouge">place_order</code> is simpler than <code class="language-plaintext highlighter-rouge">place_order_http</code>, because it is reduced to the essential components in the problem domain, and nothing more. Simply introducing a client-server architecture into this application means we have to think about data serialization, something completely unrelated to bakers, bakeries, or biscuits.</p>
+
+<p>The reason I’m so interested in refinement from this angle is that I believe the conventional methods of achieving this separation of abstraction layers fail us. Things like hexagonal / onion / layered architecture aim to separate high-level behavior from implementation choices, but at the cost of verbose and difficult code. Test suites rarely live up to the promise of supporting radical refactors without modification. Frameworks just mash all of the technical concerns together rather than expose this simple kernel of behavior underneath a complex technical system.</p>
+
+<p>Refinement offers a way to encode the most important part of the system, the abstract specification, and tie it to the final implementation. This offers a new way of thinking about programming methodology that I think is really promising. This is different than viewing refinement as purely a verification technique. In this light, refinement is actually the enabler of a way of formalizing the <em>simplicity</em> at the heart of software, in contrast to Domain-Driven Design’s attempt to tackle the complexity.</p>
+
+<p>Of course, it’s no silver bullet, and the effort to fully prove the refinement of an entire system has been shown to be quite large. But there are a growing number of successful case studies using this method such as:</p>
+
+<ul>
+  <li>The aforementioned <a href="https://sel4.systems/">sel4 project</a>. Their whole verification effort is based on refinement of an abstract specification.</li>
+  <li><a href="https://plv.csail.mit.edu/fiat/">Fiat</a> which compiles high level specifications to effcient implementations along with a proof of refinement.</li>
+  <li><a href="https://www.youtube.com/watch?v=sJwcm_worfM&amp;ab_channel=ICFPVideo">Cogent</a> which helps reduce the time and cost of verifying file system implementations (also in the sel4 project) by automating parts of the refinement process from an executable specification to C code.</li>
+</ul>
+
+<p>Cogent in particular takes a really exciting approach by solving part of this problem at the programming language level. It’s hard to refine an abstract specification all the way down to C. The Cogent compiler automates this last step to C, while also providing a corresponding specification at around the executable level. If all that’s left is to prove a refinement from the fully abstract level to this level, that still greatly reduces the cost of refinement verification in general.</p>
+
+<p>All this is to say, design patterns and architecture might not be the answer to this problem - actually separating abstract specification and implementation may be the path to a better development experience. And there are languages and tools out there waiting to be born to advance that goal.</p>
+
+<hr />
+
+<h1 id="acknowledgements">Acknowledgements</h1>
+
+<p>I’d really like to thank the members of the <a href="https://isabelle.zulipchat.com/">Isabelle Zulip chat</a> for helping me when I was stuck in the above equality proof. Particularly Wenda Li, Mathias Fleury, and Manuel Eberl all provided very helpful feedback.</p>
+
+  
+</article>
+
+
+
+<footer>
+  <nav><a href="https://twitter.com/amw_zero" ><svg aria-label="" class="icon"><use xlink:href="/assets/fontawesome/icons.svg#twitter"></use></svg></a><a href="mailto:alex.m.weisberger@gmail.com" ><svg aria-label="Mail" class="icon"><use xlink:href="/assets/fontawesome/icons.svg#envelope"></use></svg></a><a href="https://github.com/amw-zero" ><svg aria-label="Github" class="icon"><use xlink:href="/assets/fontawesome/icons.svg#github"></use></svg></a><a href="/feed.xml" ><svg aria-label="Subscribe" class="icon"><use xlink:href="/assets/fontawesome/icons.svg#rss"></use></svg></a></nav>
+
+</footer>
+
+
+</html>

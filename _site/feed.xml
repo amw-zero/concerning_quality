@@ -1,4 +1,235 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en"><generator uri="https://jekyllrb.com/" version="4.2.1">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" hreflang="en" /><updated>2021-10-06T15:22:24-04:00</updated><id>http://localhost:4000/feed.xml</id><title type="html">Concerning Quality</title><subtitle>Made with &lt;b style=&quot;color: #f45;&quot;&gt;&amp;lt;3&lt;/b&gt;</subtitle><author><name>Alex Weisberger</name></author><entry><title type="html">Misspecification: The Blind Spot of Formal Verification</title><link href="http://localhost:4000/misspecification/" rel="alternate" type="text/html" title="Misspecification: The Blind Spot of Formal Verification" /><published>2021-10-06T00:00:00-04:00</published><updated>2021-10-06T00:00:00-04:00</updated><id>http://localhost:4000/misspecification</id><content type="html" xml:base="http://localhost:4000/misspecification/">&lt;p&gt;As people, we like to be right, and we also want to avoid the effort of &lt;em&gt;proving&lt;/em&gt; that we’re right. So we often resort to logical fallacies to take shortcuts and strong-arm people into believing us. One such logical fallacy is an &lt;a href=&quot;https://en.wikipedia.org/wiki/Argument_from_authority&quot;&gt;“appeal to authority”&lt;/a&gt; - you simply reference someone or thing that is considered to be an expert, and voilá - now you are right!&lt;/p&gt;
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en"><generator uri="https://jekyllrb.com/" version="4.2.1">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" hreflang="en" /><updated>2021-11-28T00:23:20-05:00</updated><id>http://localhost:4000/feed.xml</id><title type="html">Concerning Quality</title><author><name>Alex Weisberger</name></author><entry><title type="html">Refinement: Formalizing the Simplicity Underneath Complex Programs</title><link href="http://localhost:4000/refinement/" rel="alternate" type="text/html" title="Refinement: Formalizing the Simplicity Underneath Complex Programs" /><published>2021-11-26T00:00:00-05:00</published><updated>2021-11-26T00:00:00-05:00</updated><id>http://localhost:4000/refinement</id><content type="html" xml:base="http://localhost:4000/refinement/">&lt;p&gt;“Real world” software is large, messy, and full of detail. A customer might just want to store and retrieve their data, but those simple requirements can get lost in the sea of programming language semantics, libraries, frameworks, databases, Internet protocols, serialization formats, performance optimizations, security hardening, auditability, monitorability, asynchronicity, etc., etc., ad infinitum. We should always try to simplify our stack, but practical computation is optimization to an extent - how would you like to use a logically correct application where each interaction takes 10 seconds to give feedback?&lt;/p&gt;
+
+&lt;p&gt;To really understand this difference between functional and non-functional requirements, let’s look at the concept of &lt;em&gt;refinement&lt;/em&gt;. Refinement is the fundamental concept behind behavior-preserving program transformation, and it allows us to separate abstraction from implementation in a formal and verifiable process.&lt;/p&gt;
+
+&lt;h1 id=&quot;how-product-managers-think-about-behavior&quot;&gt;How Product Managers Think About Behavior&lt;/h1&gt;
+
+&lt;p&gt;Let’s first think about behavior at a high level. Remember - &lt;a href=&quot;/why-quality/&quot;&gt;quality does not exist in a vacuum&lt;/a&gt;, and paying customers care little about a verified system that doesn’t do what they want. This is why a good product manager is part psychotherapist, first extracting the customer’s mindset before jumping into solutioning. So given that their primary concern is what a human being wants out of a system, how do they talk and think about behavior?&lt;/p&gt;
+
+&lt;p&gt;Here’s an example of something they wouldn’t say:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;To meet our customers’ requirements, we’re going to need to start with a microservice architecture communicating with gRPC over HTTP. We know that won’t be good enough, so we’ll also introduce a fanout-on-write pipeline to populate precomputed data in Redis. Of course, they also require a single-page application, so we’ll need an API gateway for a React app to call that proxies requests to the appropriate services. With this in place, the customer will be able to run their baking business on our app.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Here’s an example of something they would say:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Bakers are telling us that they keep burning their biscuits while they’re on the phone taking people’s orders. They want a self-service order platform so they can spend less time on the phone and more time baking. If their customers can place and track their own orders, the bakers could see their upcoming orders and prioritize their work with fewer phone calls. With this in place, they’ll lower their percentage of burnt biscuits (PBB) and they’ll have no problem signing up for our service contract.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;PMs think and speak about things that happen in the physical world. In the bakery example, they’d speak of bakers, biscuits, customers, and orders. They’d speak about the process of customers placing orders and how the bakers view and fulfill them. PMs live in the &lt;em&gt;problem domain&lt;/em&gt; - the sphere of activity of a particular business, field, or anything that we want to model as a computer program.&lt;/p&gt;
+
+&lt;p&gt;Let’s make this more concrete with some code. Here’s a small subset of the bakery behavior at the level of abstraction of the problem domain:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-typescript&quot; data-lang=&quot;typescript&quot;&gt;&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Order&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;customer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;string&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;amount&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;number&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;sku&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;string&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+  &lt;span class=&quot;na&quot;&gt;dueBy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;Date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;BakeryBusiness&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nl&quot;&gt;orders&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt;
+
+    &lt;span class=&quot;nx&quot;&gt;placeOrder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;orders&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;push&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;bakery&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;BakeryBusiness&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;nx&quot;&gt;bakery&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;placeOrder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;customer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Biscuit Buyer&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;amount&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;10.00&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;sku&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;b123&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;dueBy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;Date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;July 8th, 2021&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;We have an &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Order&lt;/code&gt; type, a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusiness&lt;/code&gt; class which maintains the state of orders, and the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;placeOrder&lt;/code&gt; method which adds to the current state of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Orders&lt;/code&gt;. There’s no user interface, server, database, or anything like that, just some behavior modeled as data and operations on it. A customer placing an order in real life is modeled by instantiating a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusiness&lt;/code&gt; and calling the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;placeOrder&lt;/code&gt; method on it, as shown.&lt;/p&gt;
+
+&lt;p&gt;This simple abstract data type captures the activity of the problem domain. It’s still described in a programming language, but could never be deployed as a real system because it lacks too many details necessary for a modern, interactive program to function.&lt;/p&gt;
+
+&lt;h1 id=&quot;refinement-the-opposite-of-abstraction&quot;&gt;Refinement: the Opposite of Abstraction&lt;/h1&gt;
+
+&lt;p&gt;At some point, we have to actually encode these activities as a deployable application though, and this is where the abstraction level changes. No longer are we only concerned with the nouns and verbs of the problem domain, but we also have to worry about concrete technologies, user experiences, performance, and security. Here’s where we need to think about things like relational databases, client-server architecture, and user authentication, etc.&lt;/p&gt;
+
+&lt;p&gt;Let’s introduce a client-server architecture into our &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusiness&lt;/code&gt; model:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-typescript&quot; data-lang=&quot;typescript&quot;&gt;&lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;BakeryBusinessWithServer&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nl&quot;&gt;orders&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt;
+
+    &lt;span class=&quot;nx&quot;&gt;placeOrder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;kd&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;serializedOrder&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;JSON&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;stringify&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;server&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;serializedOrder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;nx&quot;&gt;server&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;string&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;kd&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;order&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;JSON&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;parse&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;orders&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;push&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;order&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;let&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;bakery&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;BakeryBusinessWithServer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;nx&quot;&gt;bakery&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;placeOrder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;customer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Biscuit Buyer&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;amount&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;10.00&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;sku&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;b123&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;na&quot;&gt;dueBy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;Date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;July 8th, 2021&lt;/span&gt;&lt;span class=&quot;dl&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;This new implementation does the same thing: model a customer placing an order to a bakery, but it does so by making a call to a server which performs the actual functionality. This is of course a simplified model of a server, but the basic idea is there: first, the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Order&lt;/code&gt; is serialized then passed to the server. The server deserializes it back into an &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Order&lt;/code&gt; where it’s then added to the system state.&lt;/p&gt;
+
+&lt;p&gt;When the same &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;placeOrder&lt;/code&gt; call is made, the same result is achieved (at least it seems that way by inspection), but the behavior is carried out internally in a more detailed way than the previous version. We say that &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusinessWithServer&lt;/code&gt; &lt;em&gt;refines&lt;/em&gt; &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusiness&lt;/code&gt;. Refinement means going from more to less abstract, or from less to more specific. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusiness&lt;/code&gt; has hardly any detail, being just raw data and operations. Placing an order via &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusinessWithServer&lt;/code&gt; results in the same ultimate state, but introduces the more specific functionality of calling a server.&lt;/p&gt;
+
+&lt;p&gt;In some ways, this is similar to refactoring, but refactoring is &lt;a href=&quot;https://martinfowler.com/bliki/IsOptimizationRefactoring.html&quot;&gt;generally concerned with improving the readability or understandability of a program&lt;/a&gt;. Performance optimizations, for example, may or may not be considered refactors, but they are definitely considered refinements. So refactoring and refinement exist along slightly different dimensions.&lt;/p&gt;
+
+&lt;p&gt;A big difference is how each determines whether or not the behavior is the same between the two program versions. With refactoring, this is done with tests. We can imagine a set of tests that were developed for &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusiness&lt;/code&gt;, and if they pass for &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusinessWithServer&lt;/code&gt;, then the refactoring is considered to preserve the behavior. As we know, tests don’t actually catch all bugs though, and bugs can especially creep in if the new version is much more complex than the old. Imagine a bug in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;JSON.parse&lt;/code&gt; that only occurs when parsing an array containing the number 7 in a nested key, i.e. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;{ nested: { key: [7] } }&lt;/code&gt;. The abstract implementation may or may not have tests for this case, so the new implementation might introduce this bug while passing all of the existing tests (a classic example of the &lt;a href=&quot;/misspecification/&quot;&gt;underspecification that test suites provide&lt;/a&gt;).&lt;/p&gt;
+
+&lt;p&gt;Refinement, on the other hand, comes with a theory that’s mathematically verifiable. The version with the bug in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;JSON.parse&lt;/code&gt; could not be considered a refinement of the abstract version because refinement is concerned with all program executions. Even still, the difference is mostly philosophical, as (correct) refactors can always be shown to be refinements. Relating the two is convenient since most people have heard of refactoring, whereas refinement is generally only discussed in the verification community.&lt;/p&gt;
+
+&lt;p&gt;What I want to stress about refinement is that it is generally done because we &lt;em&gt;want&lt;/em&gt; to have an abstract specification of a program. This may sound odd, but consider the importance and potential utility of the product manager’s view of the system (&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;BakeryBusiness&lt;/code&gt;). It is smaller, simpler, and easier to make general statements about. It is also substantially easier to verify properties at this level of abstraction. Isn’t this view then completely demolished by the technical detail of the actual code? We then have to resort to writing endless amounts of test cases at the implementation level. From that angle, it’s not so strange to want to keep that view in tact and instead prove that the implementation refines it.&lt;/p&gt;
+
+&lt;h1 id=&quot;justifying-a-refinement&quot;&gt;Justifying a Refinement&lt;/h1&gt;
+
+&lt;p&gt;Refinement is a whole field unto itself, with the main theory being laid out in the &lt;a href=&quot;https://lara.epfl.ch/w/_media/sav08:backwright98refinementcalculus.pdf&quot;&gt;refinement calculus&lt;/a&gt;. It’s way too deep to fully cover, but here is a taste of what it takes to prove that a program is a refinement of another.&lt;/p&gt;
+
+&lt;p&gt;There are many ways to prove refinement between two programs, but the simplest to understand is equality - if two programs result in the exact same value for all possible inputs, then one can be seen to refine the other. Let’s call our more abstract method for placing orders &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order&lt;/code&gt;, and let’s call our version that uses a server &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order_http&lt;/code&gt;. In Isabelle/HOL, which for the most part resembles other functional programming languages, we would express equality of the two functions as a theorem:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-isabelle&quot; data-lang=&quot;isabelle&quot;&gt;theorem &quot;place_order_http orders order = place_order orders order&quot;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;orders&lt;/code&gt; is the state of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Orders&lt;/code&gt; in the system (corresponding to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;bakery.orders&lt;/code&gt; in the TS example), and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;order&lt;/code&gt; is the new &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Order&lt;/code&gt; being placed. The fact that their values aren’t specified means this theorem must hold for all possible values in order for it to be true.&lt;/p&gt;
+
+&lt;p&gt;Let’s first introduce the abstract implementation:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-isabelle&quot; data-lang=&quot;isabelle&quot;&gt;record order =
+  amount :: nat
+
+type_synonym orders = &quot;order set&quot;
+
+fun place_order :: &quot;orders ⇒ order ⇒ orders&quot; where
+&quot;place_order os order = insert order os&quot;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;We introduce the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;order&lt;/code&gt; type as a record with just an &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;amount&lt;/code&gt; field for simplicity, and we define the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order&lt;/code&gt; function as simply inserting an &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;order&lt;/code&gt; into the passed in state of all &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;orders&lt;/code&gt;. Note how simple this is.&lt;/p&gt;
+
+&lt;p&gt;Let’s now introduce the version that calls to a server, serializing before the call and deserializing after. Note - we implement the serialization and deserialization of the number here to illustrate that we need to know about these implementations to complete the proof:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-isabelle&quot; data-lang=&quot;isabelle&quot;&gt;type_synonym http_data = string
+
+fun digit_list :: &quot;nat ⇒ nat list&quot; where
+&quot;digit_list 0 = []&quot; |
+&quot;digit_list n = n mod 10 # digit_list (n div 10)&quot;
+
+definition string_of_nat :: &quot;nat ⇒ string&quot; where
+&quot;string_of_nat n = map char_of (digit_list n)&quot;
+
+fun nat_of_string :: &quot;string ⇒ nat&quot; where
+&quot;nat_of_string [] = 0&quot; |
+&quot;nat_of_string (d # ds) = (of_char d) + 10 * (nat_of_string ds)&quot;
+
+definition deserialize :: &quot;http_data ⇒ order&quot; where
+&quot;deserialize d = ⦇ amount = (nat_of_string d) ⦈&quot;
+
+definition serialize :: &quot;order ⇒ http_data&quot; where
+&quot;serialize ord = string_of_nat (amount ord)&quot;
+
+definition http_server :: &quot;http_data ⇒ orders ⇒ orders&quot; where
+&quot;http_server d os = place_order os (deserialize d)&quot;
+  
+definition place_order_http :: &quot;orders ⇒ order ⇒ orders&quot; where
+&quot;place_order_http os order = http_server (serialize order) os&quot;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Now, we have both &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order&lt;/code&gt; and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order_http&lt;/code&gt; defined. Aside from the implementation of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nat_of_string&lt;/code&gt; and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;string_of_nat&lt;/code&gt; for serialization purposes, this is a pretty straighforward translation from the Typescript version.&lt;/p&gt;
+
+&lt;p&gt;Now, here is the proof for our desired theorem, using an intermediate lemma:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-isabelle&quot; data-lang=&quot;isabelle&quot;&gt;lemma ser_deser[simp]: &quot;nat_of_string (string_of_nat n) = n&quot;
+  apply(induction n rule: digit_list.induct)
+   apply(auto simp: string_of_nat_def)
+  done
+
+theorem &quot;place_order_http os order = place_order os order&quot;
+  apply(cases order)
+   apply(simp add: serialize_def deserialize_def http_server_def place_order_http_def)
+  done&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Isabelle considers this proof sufficient, and we can now say that we’ve proven what seemed intuitively obvious: pushing an &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Order&lt;/code&gt; into an in-memory list has the same external behavior as calling an HTTP server which does it after deserializing the serialized data sent to it. This is true of all possible program executions though - a test case cannot be constructed that results in this equality not holding, and that’s a great assurance.&lt;/p&gt;
+
+&lt;p&gt;More importantly (for the topic of this post) is that we now have the simpler &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order&lt;/code&gt; function as a living artifact, instead of being hidden or implicit in the implementation level code. Should we want to prove anything about the system, we could do it on this version and be sure that it also holds for the implementation.&lt;/p&gt;
+
+&lt;p&gt;Here’s the full example:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-isabelle&quot; data-lang=&quot;isabelle&quot;&gt;record order =
+  amount :: nat
+
+type_synonym orders = &quot;order set&quot;
+
+fun place_order :: &quot;orders ⇒ order ⇒ orders&quot; where
+&quot;place_order os order = insert order os&quot;
+
+type_synonym http_data = string
+
+fun digit_list :: &quot;nat ⇒ nat list&quot; where
+&quot;digit_list 0 = []&quot; |
+&quot;digit_list n = n mod 10 # digit_list (n div 10)&quot;
+
+definition string_of_nat :: &quot;nat ⇒ string&quot; where
+&quot;string_of_nat n = map char_of (digit_list n)&quot;
+
+fun nat_of_string :: &quot;string ⇒ nat&quot; where
+&quot;nat_of_string [] = 0&quot; |
+&quot;nat_of_string (d # ds) = (of_char d) + 10 * (nat_of_string ds)&quot;
+
+definition deserialize :: &quot;http_data ⇒ order&quot; where
+&quot;deserialize d = ⦇ amount = (nat_of_string d) ⦈&quot;
+
+definition serialize :: &quot;order ⇒ http_data&quot; where
+&quot;serialize ord = string_of_nat (amount ord)&quot;
+
+definition http_server :: &quot;http_data ⇒ orders ⇒ orders&quot; where
+&quot;http_server d os = place_order os (deserialize d)&quot;
+  
+definition place_order_http :: &quot;orders ⇒ order ⇒ orders&quot; where
+&quot;place_order_http os order = http_server (serialize order) os&quot;
+
+lemma ser_deser[simp]: &quot;nat_of_string (string_of_nat n) = n&quot;
+  apply(induction n rule: digit_list.induct)
+   apply(auto simp: string_of_nat_def)
+  done
+ 
+theorem &quot;place_order_http os order = place_order os order&quot;
+  apply(cases order)
+   apply(simp add: serialize_def deserialize_def http_server_def place_order_http_def)
+  done&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Refinement can be much more involved than proving simple equalities like this. You can read more about a practical example of a refinement proof in the &lt;a href=&quot;http://isabelle.informatik.tu-muenchen.de/~kleing/papers/klein_sw_10.pdf&quot;&gt;paper about refinement in the sel4 OS implementation&lt;/a&gt;. This example is fine for our purposes of introducing refinement though, and hopefully illustrates the idea.&lt;/p&gt;
+
+&lt;h1 id=&quot;program-equivalence-and-simplicity&quot;&gt;Program Equivalence and Simplicity&lt;/h1&gt;
+
+&lt;p&gt;My point in bringing up refinement is to comment on the perceived complexity of software systems. It seems to me that we often think that systems are fundamentally simple at their core, but somehow we still get bogged down with all of the implementation details in bringing that simple behavior to life. I think the idea of abstraction level that refinement provides can help with this - the essence of the behavior is not the code, but a higher level specification that exists at the level of the problem domain. Refinement is then a way to transform this specification into an implementation that has an industrial-strength architecture, providing a framework for verifying that this transformation is actually correct.&lt;/p&gt;
+
+&lt;p&gt;When I hear people say “well, this is just a CRUD app,” this is what I think is behind that statement. We know that the behavior underlying a multi-process application is simpler than the code that we have to write to support that behavior. The definition of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order&lt;/code&gt; is simpler than &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;place_order_http&lt;/code&gt;, because it is reduced to the essential components in the problem domain, and nothing more. Simply introducing a client-server architecture into this application means we have to think about data serialization, something completely unrelated to bakers, bakeries, or biscuits.&lt;/p&gt;
+
+&lt;p&gt;The reason I’m so interested in refinement from this angle is that I believe the conventional methods of achieving this separation of abstraction layers fail us. Things like hexagonal / onion / layered architecture aim to separate high-level behavior from implementation choices, but at the cost of verbose and difficult code. Test suites rarely live up to the promise of supporting radical refactors without modification. Frameworks just mash all of the technical concerns together rather than expose this simple kernel of behavior underneath a complex technical system.&lt;/p&gt;
+
+&lt;p&gt;Refinement offers a way to encode the most important part of the system, the abstract specification, and tie it to the final implementation. This offers a new way of thinking about programming methodology that I think is really promising. This is different than viewing refinement as purely a verification technique. In this light, refinement is actually the enabler of a way of formalizing the &lt;em&gt;simplicity&lt;/em&gt; at the heart of software, in contrast to Domain-Driven Design’s attempt to tackle the complexity.&lt;/p&gt;
+
+&lt;p&gt;Of course, it’s no silver bullet, and the effort to fully prove the refinement of an entire system has been shown to be quite large. But there are a growing number of successful case studies using this method such as:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;The aforementioned &lt;a href=&quot;https://sel4.systems/&quot;&gt;sel4 project&lt;/a&gt;. Their whole verification effort is based on refinement of an abstract specification.&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://plv.csail.mit.edu/fiat/&quot;&gt;Fiat&lt;/a&gt; which compiles high level specifications to effcient implementations along with a proof of refinement.&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://www.youtube.com/watch?v=sJwcm_worfM&amp;amp;ab_channel=ICFPVideo&quot;&gt;Cogent&lt;/a&gt; which helps reduce the time and cost of verifying file system implementations (also in the sel4 project) by automating parts of the refinement process from an executable specification to C code.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Cogent in particular takes a really exciting approach by solving part of this problem at the programming language level. It’s hard to refine an abstract specification all the way down to C. The Cogent compiler automates this last step to C, while also providing a corresponding specification at around the executable level. If all that’s left is to prove a refinement from the fully abstract level to this level, that still greatly reduces the cost of refinement verification in general.&lt;/p&gt;
+
+&lt;p&gt;All this is to say, design patterns and architecture might not be the answer to this problem - actually separating abstract specification and implementation may be the path to a better development experience. And there are languages and tools out there waiting to be born to advance that goal.&lt;/p&gt;
+
+&lt;hr /&gt;
+
+&lt;h1 id=&quot;acknowledgements&quot;&gt;Acknowledgements&lt;/h1&gt;
+
+&lt;p&gt;I’d really like to thank the members of the &lt;a href=&quot;https://isabelle.zulipchat.com/&quot;&gt;Isabelle Zulip chat&lt;/a&gt; for helping me when I was stuck in the above equality proof. Particularly Wenda Li, Mathias Fleury, and Manuel Eberl all provided very helpful feedback.&lt;/p&gt;</content><author><name>Alex Weisberger</name></author><category term="formal_verification" /><category term="refinement" /><category term="formal_specification" /><summary type="html">“Real world” software is large, messy, and full of detail. A customer might just want to store and retrieve their data, but those simple requirements can get lost in the sea of programming language semantics, libraries, frameworks, databases, Internet protocols, serialization formats, performance optimizations, security hardening, auditability, monitorability, asynchronicity, etc., etc., ad infinitum. We should always try to simplify our stack, but practical computation is optimization to an extent - how would you like to use a logically correct application where each interaction takes 10 seconds to give feedback? To really understand this difference between functional and non-functional requirements, let’s look at the concept of refinement. Refinement is the fundamental concept behind behavior-preserving program transformation, and it allows us to separate abstraction from implementation in a formal and verifiable process.</summary></entry><entry><title type="html">Misspecification: The Blind Spot of Formal Verification</title><link href="http://localhost:4000/misspecification/" rel="alternate" type="text/html" title="Misspecification: The Blind Spot of Formal Verification" /><published>2021-10-06T00:00:00-04:00</published><updated>2021-10-06T00:00:00-04:00</updated><id>http://localhost:4000/misspecification</id><content type="html" xml:base="http://localhost:4000/misspecification/">&lt;p&gt;As people, we like to be right, and we also want to avoid the effort of &lt;em&gt;proving&lt;/em&gt; that we’re right. So we often resort to logical fallacies to take shortcuts and strong-arm people into believing us. One such logical fallacy is an &lt;a href=&quot;https://en.wikipedia.org/wiki/Argument_from_authority&quot;&gt;“appeal to authority”&lt;/a&gt; - you simply reference someone or thing that is considered to be an expert, and voilá - now you are right!&lt;/p&gt;
 
 &lt;p&gt;The reason it’s a logical fallacy is that even smart people make mistakes. Or, even more importantly, smart people can have ill-intent - what better way to use social capital than to convince your followers to buy your new book and pay for your next vacation? That’s why papers should be peer-reviewed. That’s why we reproduce empirical experiments. And that’s why we should always have healthy skepticism and evaluate an argument for ourselves.&lt;/p&gt;
 
