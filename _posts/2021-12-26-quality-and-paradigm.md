@@ -13,7 +13,7 @@ Thinking of it as a competition isn't helpful, though, because each paradigm has
 
 # Destructive Array Updates
 
-Let's use destructive array updates as a backdrop for analyzing the differences between the FP and imperative styles. We'll use C for the imperative example:
+Destructive array updates are a great backdrop for analyzing the differences between the FP and imperative styles. We'll use C for the imperative example:
 
 {% highlight c %}
 int main() {
@@ -32,7 +32,7 @@ This begs two questions:
 1. What exactly is difficult about modeling an array in FP?
 2. Why is it so convenient in an imperative language? 
 
-To look into #1, here's a first attempt at modeling the above imperative code in an FP style[^fn2]:
+To look into #1, here's a first attempt at modeling the above imperative code in an FP style, in Isabelle/HOL[^fn2]:
 
 ```
 fun update :: "'a list ⇒ nat ⇒ 'a ⇒ 'a list" where
@@ -152,17 +152,46 @@ Even though functional languages have to worry about executability at some point
 
 # Reasoning vs. Execution
 
-While the line between them is sometimes blurry, reasoning and execution are different activities. Reasoning is the ability to apply logic and patterns abstractly. It is thinking without goal. We can reason about things that could never be directly executed by a computer, like "the set of all even numbers greater than 9,000." In contrast, execution is about running specific programs on specific machines. It's finite by nature, because when a program is executed, we want to know its result. We can only execute a subset of what we can reason about, and that subset is directly governed by the capabilities of the computer running the program.
+While the line between them can seem blurry, reasoning and execution are different activities. Reasoning is logical thinking. Instead of blindly accepting a conclusion, we use reasoning to justify the steps of thought that were taken to reach it. But reasoning is abstract. Even infinite subjects, like the set of all even numbers greater than 9,000, can still be reasoned about - we know that all numbers in this set are greater than 5, for example. 
 
-This distinction is notable, because each paradigm is optimized for one activity at the expense of the other. We often say that functional programming is higher-level than imperative, with imperative being lower-level and closer to the machine. But this is only true when considering execution. Functional programming is "closer to the metal" of pure reasoning, whereas reasoning about imperative programs involves considering additional components of the underlying machine they assume.
+In contrast, execution is about running specific programs on specific machines. This is where implementation details such as instruction set architecture and word sizes have to be considered. A program might even have an infinite loop, as all interactive programs do, but we will still only practicaly execute it a finite number of times because we want to know the result of the program. For this reason, along with the practical limitations of physical hardware, execution is inherently finite, and we can only execute a subset of what we can reason about. This distinction is notable, because each programming paradigm is optimized for one activity at the expense of the other. We often say that functional programming is higher-level than imperative, with imperative being lower-level and closer to the machine. But this is only true when considering execution. 
 
-When talking about reasoning, FP is lower-level and imperative is the higher-level one. This is because, again, functional programming is based on math. Math is foundational, and can be seen as the "assembly language" of reasoning. Imperative programming acts more like a domain-specific language that can be "compiled" to pure math semantics by explicity introducing state and references, in mathematical terms.
+FP is "closer to the metal" of pure reasoning, whereas imperative programming is higher-level reasoning. This is because, again, functional programming is based on the semantics of math, which is foundational and can be seen as the "assembly language" of reasoning. With respect to reasoning, imperative programming is more like a domain-specific language that can be "compiled" to math's semantics by explicitly modeling computer memory with state and variable references in mathematical terms (as we saw in our previous example).
 
 Destructive array updates are the perfect example of this. The imperative code for our example is way more compact because it's written using an effective DSL. The CPU and memory state is abstracted away from the _syntax_, though it is still part of the semantics, i.e. what the program actually does. This is the hallmark of DSLs - they make expressing concepts in a particular domain more natural by leaving parts of it implicit.
 
-# Quality, and How to Reason About Execution
+So how does this affect the quality of "regular" programs?
 
-Again, my only point in bringing this up is to talk about quality. From that angle, the distinction between functional and imperative is moot, because programs must execute (on real hardware) and we also must reason about them to understand them. Reasoning about programs is an activity that's pretty much limited to a programmer's brain. 
+Many people will passionately pick either paradigm depending on the domain that they work in. For example, operating system and video game developers pretty much always pick imperative languages, especially compiled ones, because maximal efficiency is an absolute requirement. Many enterprise applications require far less resources, so for these some people choose higher-level languages (wrt execution) like FP or even interpreted imperative languages since they can provide an easier programmer experience. This choice has many dimensions to it, so I'm not trying to oversimplify it, but quality is a huge part of the decision. We all want fast and correct programs that are easy for a team of programmers to create, but each domain is unique, and the importance of performance or correctness has different weights.
+
+But all programs, no matter the paradgim, must execute on real hardware, and we must also reason about them to understand them. This means that, for the performance-critical applications, we still want to make guarantees about their behavior. For the less performance-critical applications, some parts of the system do end up suffering from performance problems, and we want to be able to optimize these critical paths when necessary as well. There are also cases of interest outside of these, for example graph algorithms are generally really easy to express in an imperative style and we might want to 
+
+For all of these cases, the answer to me is not to focus on reasoning or execution separately, but to use them both, i.e. to reason about execution.
+
+# Reasoning About Execution
+
+> Before software can be formally reasoned about, it must first be represented in some form of logic.[^fn5]
+
+Reasoning about software is thinking about how it will execute at runtime. As programmers, this is our primary job, trying to understand all of the possible executions that can happen. We want to be able to confidently make statements like "an array is never accessed outside of its bounds,"[^fn6] which is not always immediately obvious when the index is a dynamic value. Rather than work out a lengthy example, I just want to talk about a simple one since it involves a number of interesting techniques. Sticking with our destructive array update example from earlier, 
+
+
+```
+theorem    
+  "valid 
+    (λs. is_valid_w32 s a)
+    (update_arr' a v)
+    (λrv s. is_valid_w32 s a ∧
+      s[ptr_add a 1] = v)"
+  unfolding update_arr'_def
+  apply(wp)
+  apply(auto simp: fun_upd_def)
+  done
+end
+```
+
+garbage collector that handles memory management.A big example of that is garbage collection. 
+
+Reasoning about programs is an activity that's limited to a programmer's brain. 
 
 There are plenty of situations where a functional program 
 
@@ -185,6 +214,12 @@ Look at languages like F*, where it's actually used as the base logic for other 
 Proof assistants. bla bla.
 
 # Thoughts
+
+Again, my only point in bringing this up is to talk about quality. From that angle, the distinction between functional and imperative is moot, because programs must execute on real hardware, and we also must reason about them to understand them. We don't like to think about the bits and bytes of machines, but at some point those details tend to poke through whatever abstraction we create while trying to hide them. Take tail-recursion - recursion is the way to iterate in FP, and the immediate problem it causes is that it requires keeping the function stack state around throughout the entire recursion. If the recursion depth / number of iterations is large, the program runs out of stack space, i.e. a stack overflow occurs. 
+
+We've known about this since the lat 70s, so FP languages generally know how to optimize a program in tail-recursive form so that the actual machine code run is the same as an imperative loop.
+
+ As we said earlier, functional programs are higher-level from an execution perspective, but the only way for them to be practically usable is to use garbage collection and tail-recursion.
 
 Thinking about example using AutoCorres: https://www.mail-archive.com/devel@sel4.systems/msg02412.html. MLton compiler not installing though.
 
@@ -268,6 +303,8 @@ This makes projects like Project Everest and sel4 the most exciting to me, becau
 
 However, FP is often fiercely touted as directly leading to software of higher quality, and the oppsite is From that angle, it's worth talking about. Proponents of FP claim that the very act of using an FP design or language can get rid of whole classes of bugs. Its detractors scorn it or laugh it off as silly. When something keeps coming back though, I believe that's simply proof that there is something there, whether or not we understand it. Human intuition is like a statistical engine - while it can be wrong, it can also be right.
 
+possible footnote: You could then search for advice on how to fix a stack overflow on Stack Overflow.
+
 ---
 [^fn1]: We'll leave out other paradigms from this discussion, such as logic programming, acknowledging that FP and imperative aren't the only possible programming paradigms.
 
@@ -276,3 +313,7 @@ However, FP is often fiercely touted as directly leading to software of higher q
 [^fn3]: Compiled with `clang -S` on an M1 Macbook
 
 [^fn4]: Here, I'm saying that math is a superset of logic for convenience. The difference has been debated [for quite some time](https://www.memoriapress.com/articles/logic-not-math/), but since math requires logical reasoning in the form of proofs it's simpler to refer to math instead of always saying "math and logic." I acknowledge this might be heretical.
+
+[^fn5]: From [Automated proof-producing abstraction of C code](https://unsworks.unsw.edu.au/fapi/datastream/unsworks:13743/SOURCE02?view=true), David Greenaway's PhD's thesis.
+
+[^fn6]: This is something that some dependently typed languages can check at compile-time which is certainly an interesting path to continue to research. It's not a silver bullet either, though, because of practical limitations of what types can be expressed and checked. This tends to come down to a matter of taste, and for me, the jury is still out on the practical utility of dependently typed languages, even though some amazing work has been done in that area. Suffice it to say, formal reasoning and verification can be done absolutely be done without them.
