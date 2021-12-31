@@ -158,7 +158,7 @@ We often say that functional programming is higher-level than imperative, with i
 
 Destructive array updates are the perfect example of this. The imperative code for our example is way more compact because it's written using an effective DSL. The CPU and memory state are abstracted away from the _syntax_, though they are still part of the semantics, i.e. what the program actually does. This is the hallmark of DSLs - they make expressing concepts in a particular domain more natural by leaving parts of it implicit.
 
-So FP and imperative programming mainly differ in their acknowledgement of computer hardware and their adherence to mathematical semantics. FP is programming with reasoning, and imperative programming is programming with a machine. They intersect at the aforementioned holy grail of formally verified, fast executable programs.
+So FP and imperative programming mainly differ in their acknowledgement of computer hardware and their adherence to mathematical semantics. FP is programming with reasoning, and imperative programming is programming with a machine. They intersect at the aforementioned holy grail of formally verified, fast executable programs. For that, we need to be able to reason about imperative programs, i.e. reason about execution on a real computer.
 
 # Reasoning About Execution
 
@@ -230,15 +230,21 @@ In math, a theorem is just a statement that is proven to be true, and the primar
 * `c` is a command. This is some program statement or set of statements that we're looking to reason about.
 * `q` is a postcondition. This must be true after `c` is executed.
 
-If the precondition isn't true before executing `c`, then the postcondition will not be met. It's a prerequisite for even executing the command, otherwise we can't know anything about the correctness of it. If the precondition is true
-
 Our precondition is: `(λs. array_mem_valid s a ∧ s = s0)`, where we defined `array_mem_valid s a` as `is_valid_w32 s a ∧ is_valid_w32 s (ptr_add a 1)`. The precondition is actually a function where the argument `s` is the current state of the program, which includes the current heap state. `is_valid_w32 s a` checks that a pointer `a` in state `s` is "valid", where validity is pointer validity as described by the semantics of C. For example, for a pointer to be valid, it must not be NULL. The intention here is to guarantee memory safety - if for any reason the starting address of `a` has become NULL, this precondition is not met and `update_arr` would fail if it were called. We also add the condition that `s = s0` which is just so that we can reference this initial state in the postcondition later on, a common pattern when using Hoare triples.
 
 Then, our command is: `update_arr' a v`. This is just calling the translated `update_arr` function with arbitrary arrays `a` and values `v`.
 
 Finally our postcondition is: `λ_ s. (array_mem_valid s a) ∧ s = s0[(ptr_add a 1) := v]`. This is a function whose first value we'll ignore (`_`), and whose second value is again the program state, but after executing the command. We again check for pointer validity, ensuring that `update_arr'` is memory safe. The second part of the condition, `s = s0[(ptr_add a 1) := v]`, says that the only change to the program state is that address `a + 1` is now set to the `v` passed into `update_arr'`. This ensures that no other random memory updates have occurred.
 
-For reference, the "NF" in `validNF` stands for "non-failure" which means that we are also saying that, as long as the precondition is met, `update_arr'` will execute to termination with no failures, known as "total correctness." A more traditional way of representing Hoare triples is by writing: `{P}C{Q}`, and it can even be written this way in Isabelle using custom syntax rules, but we wrote it using a plain function call to show that there's no magic going on under the hood[^fn5].
+The "NF" in `validNF` stands for "non-failure" which means that we are also saying that, as long as the precondition is met, `update_arr'` will execute to termination with no failures, known as "total correctness." A more traditional way of representing Hoare triples is by writing: `{P}C{Q}`, and it can even be written this way in Isabelle using custom syntax rules, but we wrote it using a plain function call to show that there's no magic going on under the hood. Here are the definitions that make up `validNF`: 
+
+```
+validNF P f Q ≡ valid P f Q ∧ no_fail P f
+valid P f Q ≡ ∀s. P s ⟶ (∀(r,s') ∈ fst (f s). Q r s')
+no_fail P m ≡ ∀s. P s ⟶ ¬ (snd (m s))
+```
+
+The definitions themselves aren't exactly important for this exampe, but I'm sharing them to show that this theorem amounts to an equation, and we ultimately want to prove that the left hand and right are equivalent.
 
 To recap: we translated our actual C code into Isabelle/HOL, and then we wrote a Hoare triple which specifies what it means for `update_arr'` to be correct. If this call to `validNF` can be proven to be true, then `update_arr'` can be taken to be correct with respect to this specification. With a few proof statements, we do get Isabelle to accept this statement as proven:
 
@@ -249,10 +255,13 @@ apply(auto simp: fun_upd_def)
 done
 ```
 
-`AutoCorres` provides the proof tactic `wp` which converts a Hoare triple into the weakest precondition needed to be satisfied in order for the postcondition to hold, an [old trick from Djikstra](https://www.cs.utexas.edu/users/EWD/transcriptions/EWD04xx/EWD472.html). One absolutely invaluable benefit of moving from C to higher-order logic for reasoning is that we can use functional programming with a bit of added logic on top to define the semantics of Hoare triples. Once we do that, we can prove all kinds of things using only term simplification, which is what the `unfolding update_arr'_def and array_mem_valid_def` and `apply(auto simp: fun_upd_def)` lines mean - the proof is literally just a transformation of the code until the left hand side of an equation exactly matches the right hand side. This is only possible because of the heap being explicitly modeled, and couldn't be done by using the imperative code.
+`AutoCorres` provides the proof tactic `wp` which converts a Hoare triple into the weakest precondition needed to be satisfied in order for the postcondition to hold, an [old trick from Djikstra](https://www.cs.utexas.edu/users/EWD/transcriptions/EWD04xx/EWD472.html) that allows us to reduce a Hoare triple into a single logical formula that we need to prove. One absolutely invaluable benefit of moving from C to higher-order logic for reasoning is that we can use functional programming with a bit of added logic on top to define the semantics of a program along with Hoare triples about it. Once we do that, we can prove all kinds of things using only term simplification, which is what the `unfolding update_arr'_def and array_mem_valid_def` and `apply(auto simp: fun_upd_def)` lines mean - the proof is literally just a transformation of the code until the left hand side of an equation exactly matches the right hand side. This is only possible because of the heap being explicitly modeled, and couldn't be done by using the imperative code directly.
 
-Like I said, where functional and imperative programming intersect is where 
+# Outro
 
+By using each paradigm for what it's best at, we can formally reason about execution all the way down to the machine level when necessary. That isn't to say that we should only reserve FP for reasoning within a proof assistant. There are plenty of optimizations out there that can translate FP code into efficient machine code, the classic example being tail-call elimination. But, sometimes, embracing the machine is the right call and can lead to unparalleled performance improvements. There are also times where imperative code is just inherently more clear, with nothing to do with performance. As they say, choose the right tool for the right job.
+
+Understanding the strengths of each paradigm, though, rather than seeing either as a one-size fits all solution to all of software's problems is the key to determining which one is right and when.
 
 ---
 [^fn1]: We'll leave out other paradigms from this discussion, such as logic programming, acknowledging that FP and imperative aren't the only possible programming paradigms.
@@ -262,5 +271,3 @@ Like I said, where functional and imperative programming intersect is where
 [^fn3]: Compiled with `clang -S`
 
 [^fn4]: From [Automated Proof-producing Abstraction of C Code](https://unsworks.unsw.edu.au/fapi/datastream/unsworks:13743/SOURCE02?view=true), David Greenaway's PhD's thesis.
-
-[^fn5]: To remove even more of the magic, here are the definitions that make up `validNF`: `validNF P f Q ≡ valid P f Q ∧ no_fail P f`, `valid P f Q ≡ ∀s. P s ⟶ (∀(r,s') ∈ fst (f s). Q r s')`, and `no_fail P m ≡ ∀s. P s ⟶ ¬ (snd (m s))`
