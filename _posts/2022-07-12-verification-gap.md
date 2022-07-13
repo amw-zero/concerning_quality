@@ -9,7 +9,7 @@ Let's assume that we've made the decision to formally verify a project that we'r
 
 
 
-# Beginning at the Beginning
+# The Beginning
 
 > Begin at the beginning, and do not allow yourself to gratify a mere idle curiosity by dipping into the book, here and there. This would very likely lead to your throwing it aside, with the remark “This is much too hard for me!”, and thus losing the chance of adding a very large item to your stock of mental delights.
 > <br><br> **Symbolic Logic**
