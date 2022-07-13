@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 'State Space Explosion: the Reason We Can Never Test Software to Perfection'
+title: 'State Space Explosion: The Reason We Can Never Test Software to Perfection'
 tags: testing
 author: Alex Weisberger
 ---
