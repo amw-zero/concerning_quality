@@ -25,6 +25,10 @@ On the other end of the spectrum is what I'm certainly most familiar with, and I
 
 If you ask me, this is perfectly justified because since the inception of computing, we've been bogged down with solving legitimately and extremely difficult problems. Like the small feat of figuring out how to write and execute programs with machines, or building complex compiler toolchains. We've been busy figuring out how to enable ourselves to actually build the software that the world desires, and adding verifiability on top of that just hasn't been a factor with much economic pressure behind it.
 
+But it leads to a big problem: we couldn't verify programming-language programs even if we wanted to! Our only options are static analysis or testing, which just don't have the power to get us all the way to full confidence in functional correctness. Between logics and programming languages, we have [two different tools with two different sets of characteristics]({% post_url 2021-12-30-quality-and-paradigm %}), and both seem necessary for the foreseeable future. One option is of course to combine the two silos into one vertical and formally-defined system, but the merits of doing that are hypothetical at this point. 
+
+The other option is simply to connect the two sides.
+
 # Closing the Gap
 
 It certainly seems that there's been an uptick in interest in formal methods recently, with various forms of it being used at [Amazon](https://lamport.azurewebsites.net/tla/formal-methods-amazon.pdf), [Mozilla](https://blog.mozilla.org/security/2020/07/06/performance-improvements-via-formally-verified-cryptography-in-firefox/), [Microsoft](https://project-everest.github.io/), [Elastic](https://www.youtube.com/watch?v=qYDcbcOVurc), [Cockroach Labs](https://www.cockroachlabs.com/blog/parallel-commits/), [MongoDB](https://www.youtube.com/watch?v=wVmGMQZSP88&list=PLvaSNyqj9rnK4ZJHenG-4emWltWh4vpFv&index=6), and others. We've gotten very far with our current tooling and testing methodologies, but we may be at a tipping point where we're expected to build such constantly complex software that a new level of tools is necessary - a possible second software crisis.
@@ -35,11 +39,11 @@ So on one end of the gap we have logical formalisms with pure and unambiguous se
 
 ## Program Extraction
 
-With this approach, we start out all the way at the verifiability end of the spectrum. That is, we don't start with a "typical" programming language, but we first express the logic of our program in some formal logic. Most commonly with this approach, this is done in a proof assistant like Isabelle/HOL, Coq, or Why3. I'm most familiar with Isabelle, but all of the ones listed here have logics that feel very similar to Standard ML, Ocaml, or Haskell with some additional features for expressing theorems. In fact, [Concrete Semantics](http://concrete-semantics.org/), the amazing book about compiler correctness, describes its underlying logic (higher-order logic, or HOL) as being "functional programming + logic."
+With this approach, we start out all the way at the verifiable end of the spectrum. That is, we don't start with a programming language, but we first express our program in a logic. Most commonly with this approach, this is done in a proof assistant like Isabelle/HOL, Coq, or Why3. I'm most familiar with Isabelle, but all of the ones listed here have logics that feel very similar to Standard ML, Ocaml, or Haskell with some additional features for expressing theorems.[^fn3]
 
 An example project that took this approach is [CompCert](https://compcert.org/), the formally verified C compiler. The compiler functionality and correctness theorems are all described and proved in Coq's logic, and Coq, like most proof assistants, provides the functionality to translate from its logic to a "real" programming language - in this case Ocaml.
 
-It's important to note that the program extraction itself is generally not verified, so the full trust in the verification effort ends at this boundary. However, the extraction process is also fairly straightforward due to the closeness of Coq's logic ([the Calculus of Inductive Constructions](https://en.wikipedia.org/wiki/Calculus_of_constructions)) and Ocaml. This is the case for many proof assistants and languages.
+It's important to note that the program extraction itself is generally not verified, so the full trust in the verification effort ends at this boundary. However, the extraction process is fairly straightforward due to the closeness of Coq's logic ([the Calculus of Inductive Constructions](https://en.wikipedia.org/wiki/Calculus_of_constructions)) and Ocaml. This is the case for many proof assistants and languages.
 
 ## Program Parsing
 
@@ -59,7 +63,7 @@ The last approach is where we do all of our verification on a logical specificat
 
 MongoDB used this to [test the implementation of a conflict-resolution algorithm](https://www.youtube.com/watch?v=wVmGMQZSP88&t=954s) in their MongoDB Realm product. First, they wrote a TLA+ specification of the algorithm. They used TLC, the TLA+ model checker, to check some properties on this model to get confidence about its functionality. They then used a combination of the TLA+ tooling and some of their own custom tooling to generate test cases for their Golang implementation of the algorithm. All-in-all, this led to 4,913 test cases being generated which achieved 100% branch coverage in the implementation.
 
-Overall generating test cases is a compelling approach because of its simplicity. Test frameworks exist for all major programming langauges, so the only problem to solve is how to map the specification to test cases in an automated process. Compared to other tasks in the verification sphere, this is pretty straightforward. The main downside is that anything short of exhaustive testing isn't verification anymore, so the trust in the implementation holding the same properties as the spec isn't as strong.
+Overall generating test cases is a compelling approach because of its simplicity and power. Test frameworks exist for all major programming langauges, so the only problem to solve is how to map the specification to test cases in an automated process. Compared to other tasks in the verification sphere, this is pretty straightforward. With testing, more cases means more confidence as well, and generating that many cases is much more efficient than writing them all by hand. The main downside is that anything short of exhaustive testing isn't verification anymore, so the trust in the implementation holding the same properties as the spec isn't as strong.
 
 # Closing Thoughts
 
@@ -70,3 +74,5 @@ The verification gap is often brought up as an argument for formal verification 
 [^fn1]: Like [F*](https://www.fstar-lang.org/), [Dafny](https://dafny.org/dafny/), [Why3](https://why3.lri.fr/doc/index.html), and [Chalice](https://www.microsoft.com/en-us/research/project/chalice/). Each takes a different and interesting approach to bridging the verification gap.
 
 [^fn2]: The only marginally used language that I know about with a full formal semantics is [Standard ML](https://smlfamily.github.io/sml90-defn.pdf). Worth mentioning, [WebAssembly](https://webassembly.github.io/spec/core/) does too! If others are out there, I'd love to know about them.
+
+[^fn3]: In fact, [Concrete Semantics](http://concrete-semantics.org/), the amazing book about compiler correctness, describes its underlying logic (higher-order logic, or HOL) as being "functional programming + logic."
