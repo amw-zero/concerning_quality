@@ -19,7 +19,7 @@ If it hasn't been clear, I'm mostly interested in which aspects of formal method
 
 As always, testing and verification starts out with the surprisingly difficult question of: "what is our program supposed to do"? And as we talked about in [Refinement]({% post_url 2021-11-26-refinement %}), the answer to that question also depends on who you ask. But when you start to think about it, the really crazy thing is that the only way to know the answer to this question is by looking at the code - the code _is_ the source of truth for the behavior. 
 
-Is this a good idea? Do we need to look at JSON serialization, database queries, caching layers, or other distributed system minutae to figure out what is supposed to happen when a user clicks "submit" on some form? 
+Is this a good idea? Do we need to look at JSON serialization, database queries, caching layers, or other distributed system minutiae to figure out what is supposed to happen when a user clicks "submit" on some form? 
 
 Model-based testing instead encourages us to create a high level model of our system, and to use it to test that the implementation conforms to the model. The model serves as a functional specification of the application that we can test the implementation against. Now Djikstra was no fan of testing, but if we relax the requirement of a full-blown proof we can arrive at a more lightweight definition of a "solid" product: a triple of a program, a model, and a property-based test that checks that the program conforms to the model. 
 
