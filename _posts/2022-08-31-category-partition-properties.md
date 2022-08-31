@@ -181,7 +181,7 @@ The produced test frame from this selection combination is:
 
 ~~~
 {
-  dateRange: { start: 2022-03-03T17:34:48.422Z, end: 2022-03-31T16:34:48.422Z },
+  dateRange: { start: "2022-03-03T17:34:48.422Z", end: "2022-03-31T16:34:48.422Z" },
   recurringTransactions: [{ 
     name: "monthlyRt1", 
     amount: 10, 
