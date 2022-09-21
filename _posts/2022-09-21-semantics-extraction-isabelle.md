@@ -186,7 +186,7 @@ Behind the scenes there's a little more OCaml setup with dune to get all this to
 
 # Now What?
 
-Now that we have this interpreter what can what can we do with it? We can of course just use it directly if we want our langauge to stay interpreted and that's it. But it can also be used as a source of truth for other language components.
+Now that we have this interpreter what can what can we do with it? We can of course just use it directly if we want our language to stay interpreted and that's it. But it can also be used as a source of truth for other language components.
 
 For example, Conrad Watt [formalized the semantics of WebAssembly](https://www.cl.cam.ac.uk/~caw77/papers/mechanising-and-verifying-the-webassembly-specification.pdf) and used it to check wasm implementations against an extracted reference interpreter using fuzz testing. This is a hybrid approach, somewhere between program extraction and model-based test case generation, and it allows for hand-writing a language implementation while still being "connected" to the verified semantics. 
 
