@@ -5,7 +5,7 @@ tags: formal_methods pl_theory
 author: Alex Weisberger
 ---
 
-Sometimes building a language is the best solution to a problem. This takes on many forms, from [desgining DSLs to implement an OS shell](https://www.oilshell.org/blog/2022/03/middle-out.html) to [more ambitious languages for verifying filesystems](https://trustworthy.systems/projects/TS/cogent.pml). Since we're in [the Golden age of PL Research](https://semantic-domain.blogspot.com/2022/09/the-golden-age-of-pl-research.html), there are plenty of reasons to give language design a try!
+Sometimes building a language is the best solution to a problem. This takes on many forms, from [designing DSLs to implement an OS shell](https://www.oilshell.org/blog/2022/03/middle-out.html) to [more ambitious languages for verifying filesystems](https://trustworthy.systems/projects/TS/cogent.pml). Since we're in [the Golden age of PL Research](https://semantic-domain.blogspot.com/2022/09/the-golden-age-of-pl-research.html), there are plenty of reasons to give language design a try!
 
 Languages are foundational, though, and soundness issues in them affect all of their programs. This makes them a great candididate for formalization and verification, since the cost of errors is very high, but as usual that means we have to address [the verification gap]({% post_url 2022-07-12-verification-gap %}). In this post we'll cross the gap by building and (partially) verifying an operational semantics of a small language in [Isabelle/HOL](https://isabelle.in.tum.de/), and we'll extract this semantics into an executable interpreter in OCaml.
 
