@@ -204,7 +204,7 @@ For all initial states 's',
   execute(impl, s, acts) = execute(model, s, acts)
 ```
 
-Less formally: no matter what seqeunce of actions you take in the implementation, nor what state it starts in, it should always agree with the model. The key words being "no matter what" and "always" - this should be true of all actions, in any order, from any starting state, ever. In other words, this statement is _complete_, and we'll refer to it as "the holistic correctness statement." It's important to keep this statement in mind, since **this is our definition of correctness and our end goal**, and any optimization that we do always has to tie back to it. (Note: this is also a classic way of expressing [refinement]({% post_url 2021-11-26-refinement %})).
+Less formally: no matter what sequence of actions you take in the implementation, nor what state it starts in, it should always agree with the model. The key words being "no matter what" and "always" - this should be true of all actions, in any order, from any starting state, ever. In other words, this statement is _complete_, and we'll refer to it as "the holistic correctness statement." It's important to keep this statement in mind, since **this is our definition of correctness and our end goal**, and any optimization that we do always has to tie back to it. (Note: this is also a classic way of expressing [refinement]({% post_url 2021-11-26-refinement %})).
 
 As we hinted at in the introduction, there are some very unfortunate things about this holistic correctness statement in a practical testing context. First is the `actions` variable. A real application accepts an infinite stream of actions. Even though we limit our test to finite sequences, combinatorics is just not on our side, with the number of k-length sequences of n actions equaling n^k - a dreadful exponential growth curve. That means that as the number of actions in the systems grows, and as we test longer sequences, the number of possible interleavings of actions grows exponentially. Whatever subset of sequences our test generates is an infinitesimal portion of them all.
 
@@ -233,9 +233,8 @@ The goal here is to be able to compare the implementation to the model, and if t
 
 ```
 ** Correctness via Refinement Mapping ** 
-For all initial states 's',
-  all implementation states 's',
-  all implementation action functions 'impl',
+For all implementation states 's',
+  all implementation actions 'impl',
   all model actions 'model'
   and a refinement mapping 'rm':
 
@@ -330,7 +329,8 @@ In the model-based testing context, instead of comparing the functions at the gl
 
 For all action functions 'impl',
   all action functions 'model',
-  and all local states 'ls':
+  all local states 'ls',
+  and a refinement mapping 'rm':
   
   rm(impl(ls)) = model(rm(ls))
 ```
@@ -366,22 +366,23 @@ The end result of this is that we can get global guarantees for the cost of loca
 
 One last wrinkle presents itself for now - the notorious problem number 4. It may sound counterintuitive, but there are both refinement mappings and properties of our systems that are not expressible with the state variables of the system itself. Even if they are, they may be more naturally expressed by adding _auxiliary variables_. Auxiliary variables are additional variables that are added to a program (usually the implementation) that don't affect the behavior of the program, but can be used to state properties or aid in a refinement mapping to a model.
 
-Auxiliary variables provide one solution to a problem in the budget app test, and for tests for client-server applications in general. Our implementation is the state component of a single-page application, and one implication of that is that the client and database state can become out of sync. Consider the following action sequence:
+Auxiliary variables provide one solution to a problem in the budget app test, and for tests for client-server applications in general. Our implementation is both the state component of a single-page application, and the corresponding server and database. One implication of that is that the client and database state can become out of sync. Consider the following action sequence:
 
-* The database starts with these recurring transactions: [rt1, rt2, and rt3].
+* The database starts with these recurring transactions: [rt1, rt2, rt3].
 * User 1 loads the home page - its client holds [rt1, rt2, rt3]
+* User 2 loads the home page - its client holds [rt1, rt2, rt3]
 * User 2 deletes rt2 - its client now holds [rt1, rt3], and the database holds [rt1, rt3]
 * User 1 adds a new recurring transaction, rt4 - its client holds [rt1, rt2, rt3, rt4] and the database holds [rt1, rt3, rt4].
 
 At the end of these actions, the system has the following state:
 
-User 1's client: [rt1, rt2, rt3, rt4]
-User 2's client: [rt1, rt3]
+User 1's client: [rt1, rt2, rt3, rt4]<br>
+User 2's client: [rt1, rt3]<br>
 The database: [rt1, rt3, rt4]
 
-Again, there are a few different ways to go about either allowing or disallowing this behavior. One option is to just forbid differences in client values, but this would require a web socket to update all clients on each data write. While some applications actually do this (like chat applications), I would say that most don't. Instead, we have to allow diverging client states, but we still want to do that in a controlled manner.
+Again, there are a few different ways to approach either allowing or disallowing this behavior. One option is to just forbid differences in client values, but this would require a web socket to update all clients on each data write. While some applications actually do this (like chat applications), I would say that most don't. Instead, we have to allow diverging client states, but we still want to do that in a controlled manner.
 
-Well, one solution to that is to add a separate model instance as an auxiliary variable to the implementation which tracks the source of truth of the state of the client alone. Then, whenever a write occurs, we double-write to the implementation and this client model. Again, there are many patterns for doing this, but I like wrapping the implementation (`Client` here) in a new class with the same interface that forwards actions to the relevant members, this way the structure of the test doesn't have to change:
+Well, one solution to that is to add a separate model instance as an auxiliary variable to the implementation which tracks the source of truth of the state of the client alone. Then, whenever a write occurs, we double-write to the implementation and this client model. Again, there are many patterns for doing this, but I like wrapping the implementation (`Client` here) in a new class with the same interface that forwards actions to the relevant members, this way the structure of the test doesn't have to change and we keep all of the auxiliary variables in test-specific code:
 
 ~~~
 class Impl {
@@ -406,13 +407,15 @@ class Impl {
 ~~~
 {: .language-typescript}
 
-In the test excerpt, we see another assertion named `checkImplActionProperties`, and its defintion will now make sense:
+In the test excerpt, we see another assertion named `checkImplActionProperties`[^fn4], and its defintion will now make sense:
 
 ~~~
 async function checkImplActionProperties(impl: Impl, t: Deno.TestContext) {
   await t.step("loading is complete", () => assertEquals(impl.client.loading, false));
 
-  await t.step("write-through cache: client state reflects client model", () => assertEquals(impl.client.recurringTransactions, impl.aux.clientModel.recurringTransactions));
+  await t.step("write-through cache: client state reflects client model",
+    () => assertEquals(impl.client.recurringTransactions, impl.aux.clientModel.recurringTransactions)
+  );
 }
 ~~~
 {: .language-typescript}
@@ -421,7 +424,7 @@ After each action has been invoked, we check that the actual state of the client
 
 The key here is that, as long as they don't affect the behavior of the implementation, we can add any auxiliary variables we want for tracking _additional_ information. Once we have them, we can use them for test assertions, totally independent of the implementation that runs in production. They're test-only code.
 
-I'm going to be honest - I can have too much fun with auxiliary variables, and that means that we should be careful with them. They are basically a cheat code, and can be used as an escape hatch to get out of all kinds of situations. That being said, they're sometimes the most elegant solution to a problem, and they're a key piece in making our test flexible towards many scenarios that arise in the future. If anything becomes difficult to assert on or express as a property, we can try and make them easier by adding new auxiliary variables.
+I'm going to be honest - I can have too much fun with auxiliary variables, and that means that we should be careful with them. They are basically a cheat code, and can be used as an escape hatch to get out of all kinds of situations. That being said, they're sometimes the most elegant solution to a problem, and they're a key piece in making our test flexible enough to handle the many scenarios that arise in practice. If anything becomes difficult to assert on or express as a property, we can try and make them easier by adding new auxiliary variables.
 
 # Recap
 
@@ -432,11 +435,11 @@ Alrighty. We went over four main problems and solutions to them:
 3. State incompatibility
 4. Expression inability
 
-We introduced refinement mappings, which are functions from the implementation state to the model state, and which overcome both state incompatibility and avoid action sequences. We showed that by using action-local state we can avoid ever constructing global system state in the test. And we showed that if we ever have the inability to express a property about our system, we can always add auxiliary variables which don't affect the system behavior but track additional information that we can use in test assertions.
+We introduced refinement mappings, which are functions from the implementation state to the model state, and which require that single-transitions in the implementation and model must be equivalent under this mapping. This overcomes both state incompatibility and the need for action sequences. We showed that by using action-local state we can avoid ever constructing global system state in the test. And we showed that if we ever have the inability to express a property about our system, we can always add auxiliary variables which don't affect the system behavior but track additional information that we can use in test assertions.
 
-What we ended up with is a framework for writing model-based tests that is both efficient and flexible.
+What we ended up with is a framework for writing model-based tests that is both efficient and flexible, and applicable to real-world systems like database-backed web applications.
 
-The linked papers have plenty of more theoretical background and examples for deeper dives on these topics.
+The linked papers have plenty more theoretical background and examples for deeper dives on these topics.
 
 # Thanks
 
@@ -449,3 +452,5 @@ Big thanks to [Hillel Wayne](https://www.hillelwayne.com) for having an in depth
 [^fn2]: We'll expand on what auxiliary variables are throughout the post, but you can read more about them [here](https://lamport.azurewebsites.net/tla/hiding-and-refinement.pdf) and [here](https://lamport.azurewebsites.net/pubs/auxiliary.pdf).
 
 [^fn3]: Errors that can be present in the implementation but not the model are an interesting topic. For example, if a network error in a request during the course of an action in the implementation, then it certainly won't complete the action in a way that implements the model. One option is to be liberal, and simply avoid comparing the model and implementation in this case. We didn't cover stuttering here, but models are allowed to stutter (transition to the current state) during implemenation steps, so an implementation error could be interpreted as a model stutter. The issue is, if the network error happens on every single action invocation, the implementation will never match the non-stuttering step of the model. The other option is to be harsh, and require that there are no network errors in tests, but still plan for them and allow them in production. This current version of this test chooses to be harsh. I'll let you know how that goes.
+
+[^fn4]: [Action properties](https://www.hillelwayne.com/post/action-properties/) are a subset of temporal properties. They allow you to assert things about state transitions, that you couldn't assert about individual states. They're very useful.
