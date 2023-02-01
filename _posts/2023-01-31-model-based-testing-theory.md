@@ -210,7 +210,7 @@ As we hinted at in the introduction, there are some very unfortunate things abou
 
 Next is the `s` variable. This is the _entire_ state of the system, and unless we're building a counter application with a single integer variable it's way too much data to generate in a test.
 
-A third problem is that `s` is used in both of the model and implementation, which means that they both have to have the same state type. This very rarely works, because the whole point of separating the model and implementation is that the implementation is complex and will have additional state to deal with that. States are often compatible in practice.
+A third problem is that `s` is used in both of the model and implementation, which means that they both have to have the same state type. This very rarely works, because the whole point of separating the model and implementation is that the implementation is complex and will have additional state to deal with that. States are often incompatible in practice.
 
 The last straw is that sometimes, you don't even have the state variables that you need to check for correctness. This sounds weird, but it's well known that specifications often have to be augmented with "invisible" variables so that certain properties can be shown to hold.
 
@@ -229,7 +229,7 @@ function refinementMapping(impl: Impl): Budget {
 ~~~
 {: .language-typescript}
 
-The goal here is to be able to compare the implementation to the model, and if they have different state types we need to translate states in the implementation's state space to ones in the model's. On top of this, the most relevant other rule for a valid refinement mapping is that, for all implementation states and actions, the action is equivalent to the model action with the refinement mapping applied in the appropriate places. In logic pseudocode; 
+The goal here is to be able to compare the implementation to the model, and if they have different state types we need to translate states in the implementation's state space to ones in the model's. On top of this, the most relevant other rule for a valid refinement mapping is that, for all implementation states and actions, the action is equivalent to the model action with the refinement mapping applied in the appropriate places. In logic pseudocode:
 
 ```
 ** Correctness via Refinement Mapping ** 
@@ -287,7 +287,7 @@ It's great progress, but we can do even better.
 
 # From Global to Local State
 
-The `s` variable in our new iteration of the correctness statement is still the global state, but an observation comes to mind: how much of the global state is necessary for each action? There's no equation which answers this question directly, but intuitively, an action will only ever operate on a small subset of the global state, leaving the rest unchanged. We can then just ignore that superfluous state and think of the action as operating on its own, local state. This is not related to refinement mapping, or any other theory that I know of (thought it might relate to one that I don't know of), but ends up being a very useful optimization in practice.
+The `s` variable in our new iteration of the correctness statement is still the global state, but an observation comes to mind: how much of the global state is necessary for each action? There's no equation which answers this question directly, but intuitively, an action will only ever operate on a small subset of the global state, leaving the rest unchanged. We can then just ignore that superfluous state and think of the action as operating on its own, local state. This is not related to refinement mapping, or any other theory that I know of (though it might relate to one that I don't know of), but ends up being a very useful optimization in practice.
 
 For example, consider an oddly-specific system for point translation:
 
