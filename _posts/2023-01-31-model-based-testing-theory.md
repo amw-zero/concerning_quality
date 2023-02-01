@@ -7,7 +7,7 @@ author: Alex Weisberger
 
 In [Property-Based Testing Against a Model of a Web Application]({% post_url 2022-08-11-model-based-testing %}), we built a web application and tested it against an executable reference model. The model-based test in that post checks sequences of actions against a global system state, which is simple to explain and implement, but is unsuitable for testing practical applications in their entirety. To test the diverse applications that arise in practice, as well as test more surface area of a single application, we'll need a more efficient and flexible approach.
 
-In that post, I promised that we'd dive deeper into the theory of model-based testing. To upgrade our testing strategy, we'll look at the theoretical concepts of _refinement mappings_[^fn1] and _auxiliary variables_[^fn2], and add in a couple of tweaks based on the specific context of testing. All of this will get applied to a real test of a full-stack application.
+In that post, I promised that we'd dive deeper into the theory of model-based testing. To upgrade our testing strategy, we'll look at the theoretical concepts of _refinement mappings_[^fn1] and _auxiliary variables_[^fn2], and add in a couple of tweaks based on the specific context of testing. All of this will get applied to [a real test of a full-stack application](https://github.com/amw-zero/personal_finance_funcorrect/blob/main/simulation.ts).
 
 
 
