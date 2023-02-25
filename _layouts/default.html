@@ -29,6 +29,15 @@
   {% assign pages = site.pages | where_exp: "item", "item.title and item.sitemap != false" | sort: "order" %}
 {% endif %}
 
+<link rel="stylesheet" href="/assets/highlight/stackoverflow.min.css">
+<script src="/assets/highlight/highlight.min.js"></script>
+<script type="module">
+import sligh from '/assets/highlight/sligh.js';
+hljs.registerLanguage('sligh', sligh);
+</script>
+
+<script>hljs.highlightAll();</script>
+
 <header>
   <a href="{{ "/" | relative_url }}" class="title">{{ site.title | escape }}</a>
   {% include menu.html menu=pages %}
