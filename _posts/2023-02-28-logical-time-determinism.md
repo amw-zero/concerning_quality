@@ -99,7 +99,7 @@ Because N = 2 is no fun, here's N = 5 (i.e. 5 concurrent requests) which has 639
 
 I'm sure a mutex will make this more manageable.
 
-# Logical Time and Time-Travel
+# Logical Time, Time-Travel, and Beyond
 
 Both state graphs show the set of all behaviors for the given system, and they do this by showing _logical_ time, in contrast to physical time. A user might wait 17 years before selecting a transition in a UI, or an OS scheduler might pick one thread to execute while another waits for I/O. The real-world execution of a program runs in physical time, but our state graphs are only concerned with abstract states and transitions between them. And good thing for that - it would be awkward to have to wait 17 years to understand the possible behaviors of TodoMVC.
 
@@ -107,15 +107,21 @@ Beyond helping us understand the complete picture of all of the different interl
 
 All we need for logical time are states and transitions between them, i.e. logical time is inherently tied to state machines / transition systems. In fact, a time-travel debugger can pretty much be seen as a user interface for a state machine. But most importantly, this mental model allows us to have a totally deterministic view of the behavior of a complex system. That in turn enables powerful features like time-travel debugging.
 
+To take advantage of logical time, this model has to be built into an application somehow. Because our tools generally don't have any notion of determinism, you often see this with language-layer patterns like Redux or the Elm Architecture, or architecture-level patterns like event sourcing. All of those patterns reduce nicely down to the sequential state machine model presented here, but they're up to the application developer to implement. The question that the Tomorrow Corporation demo asks is: what do we get if our tools did this for us without any additional effort?
+
+Imagine not needing to have to add sleeps / retries to tests of asynchronous behavior. Or imagine a tool that identified concurrent code and showed us the different interleavings that we might have otherwise been unaware of, and allowed us to step through and try each of them out. I'm not a Nix user (yet), but others are already imagining a world with deterministic package management. Non-determinism is fundamentally at odds with human brains it seems like, so I for one would love to see more determinism in any tool that I use.
+
+To get there, we'll have to understand and implement logical time.
+
 # Outro
 
-I have no idea how the tools at Tomorrow Corporation are implemented, but I respect their commitment to determinism. Non-determinism is completely necessary in many cases, but to have full control over a system it's essential to view it through the deterministic lens of logical time. Because of things like concurrency which often rely on OS or language features that we can't directly interact with, this can be difficult, but that video shows that there's tremendous value in baking determinism into our tools. How far down the stack can we go though?
+I have no idea how the tools at Tomorrow Corporation are implemented, but I respect their commitment to determinism. Non-determinism is a part of life, but to have full control over a system it's essential to view it through the deterministic lens of logical time. Because of things like concurrency which often rely on OS or language features that we can't directly interact with, this can be difficult, but that video shows that there's tremendous value in baking determinism further down into our foundational tools.
 
-Imagine not needing to have to add sleeps / retries to tests of asynchronous behavior. Or imagine a tool that identified concurrent code and showed us the different interleavings that we might have otherwise been unaware of, and allowed us to step through and try each of them out. I'm not a Nix person (yet), but imagine a world with deterministic package management. Non-determinism is fundamentally at odds with human brains, it seems like, so I for one would love to see more determinism in any tool that I use.
+The main thing I wanted to share in this post was a specific mental model. Sequential state machines are a tried and true model with deterministic properties, and they've legitimately changed how I look at software. In this model, a program is a set of behaviors, where each behavior is a sequence of states. It's hard to imagine reducing programming down to a simpler explanation than that, and that clarity is necessary for wrangling complexity.
 
-The main thing I wanted to share in this post was a specific mental model. Determinism via sequential state machines is exactly the mental model that [TLA+](https://learntla.com/) recommends, and that model has legitimately changed how I look at software. Before we bring determinism to more of our tools, it's important to conceptually understand what determinism is, and TLA+ is great for that because it is powerful enough to model "real" software. You can use the mental model without TLA+, but if you ever want to double check your thoughts, it's a great tool to play around with because it has a model checker.
+The images in this post were generated from [TLA+ specs](https://learntla.com/), which I won't really explain, but hopefully they show that it doesn't take a ton of effort to write simple models. TLA+ is a logic and tool which has this mental model at its foundation. I can't recommend learning and using it enough. Its companion model checker makes the act of modeling tactile, and you can get machine feedback on your models vs. getting stuck in state-machine quicksand. The state graph visualizer is also very handy sometimes, though as was shown here is more useful when the bounds of the model are small.
 
-The images in this post were all generated from TLA+ specs. Here's the spec for TodoMVC:
+Here's the spec for TodoMVC:
 
 ```
 ------------------------------ MODULE TodoMVC ------------------------------
@@ -166,6 +172,8 @@ Next == SendReq \/ RecvResp
 
 =============================================================================
 ```
+
+Even if you never use TLA+, the mental model presented here can help understand software at a more fundamental level. Kudos to the Tomorrow Corporation team for an inspiring set of tools that I hope pushes people to think about determinism more.
 
 <hr>
 
