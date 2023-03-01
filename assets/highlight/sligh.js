@@ -4,8 +4,6 @@ Language: Sligh
 
 
 export default function(hljs) {
-  console.log("Running Sligh highlighter")
-
   const MAIN_KEYWORDS = [
     'process',
     'data',
