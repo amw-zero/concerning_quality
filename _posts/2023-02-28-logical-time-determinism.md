@@ -76,18 +76,18 @@ Determinism isn't necessarily easy.
 
 Concurrency is another notorious source of non-determinism, but let's define why. Imagine we have N network requests that start in an idle state, begin fetching some data, and eventually complete. Continuing to keep our bounds small, let's start with N = 2:
 
-<img src="/assets/determinism/RequestsFont.svg" style="max-width: 112%; position: relative; left: -48px;" />
+<img src="/assets/determinism/RequestsFont.svg" />
 <div style="display: flex; justify-content: center;">
   <img src="/assets/determinism/RequestsLegend.svg" />
 </div>
 
 In every state, we can either initiate an uninitiated request or an in-progress request can complete. It's possible for different requests to complete in different orders too, e.g. request 0 can complete first:
 
-<img src="/assets/determinism/Requests-Req0.svg" style="max-width: 112%; position: relative; left: -48px;" />
+<img src="/assets/determinism/Requests-Req0.svg" />
 
 And request 1 can also complete first, even if request 0 was initiated before it:
 
-<img src="/assets/determinism/Requests-Req1.svg" style="max-width: 112%; position: relative; left: -48px;" />
+<img src="/assets/determinism/Requests-Req1.svg" />
 
 The order that requests complete is a non-deterministic choice, which we've already seen, but there's a major difference from the TodoMVC example: the OS or language runtime determines the choice, not a user. This is one reason why concurrency is a constant thorn in the side, and feels much more complex than the non-determinism of user interfaces. We literally don't have control over the order of operations. 
 
