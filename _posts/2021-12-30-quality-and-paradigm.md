@@ -34,7 +34,7 @@ This begs two questions:
 
 To look into #1, here's a first attempt at modeling the above imperative code in an FP style, in Isabelle/HOL[^fn2]:
 
-```
+{% highlight plaintext %}
 fun update :: "'a list ⇒ nat ⇒ 'a ⇒ 'a list" where
 "update [] i v = []" |
 "update (x # xs) i v =
@@ -44,13 +44,15 @@ definition "fp_list = [1, 2, 3::int]"
 
 value "update fp_list 1 4" (* Returns [1, 4, 3] *)
 value "fp_list" (* Returns [1, 2, 3] *)
-```
+{% endhighlight %}
+
 
 We use a list to model an array since we can represent a list as a recursive datatype directly, e.g. `(Cons 1 (Cons 2 (Cons 3 Nil)))`. We have an `update` function which uses recursion and pattern matching on the list values to build up the updated value from scratch, with `update fp_list 1 4` equaling the desired value: `[1, 4, 3]`. However, this function does not have the semantics of the array update because `fp_list's` value remains unchanged after being passed as an argument to `update`. The value returned by `update` is not connected to or tied to the value of `fp_list` in any way, and this is because that is simply the semantics of mathematical functions - they only map input values to output values, i.e. they are pure.
 
 To achieve destructive update semantics, we need to add the notion of a "reference." A reference is an indirection, a way to _refer_ to a value by something like a name or an address. There are a million ways to do this, but here's a simple approach:
 
-```
+{% highlight plaintext %}
+
 type_synonym var_name = "string"
 type_synonym state = "var_name ⇒ int list"
 
@@ -68,7 +70,8 @@ definition imp_update :: "state ⇒ var_name ⇒ nat ⇒ int ⇒ state" where
 definition "state ≡ λ v. (if v = ''a'' then fp_list else [])"
 
 value "read_state (imp_update state ''a'' 1 4) ''a''" (* [1, 4, 3] *)
-```
+{% endhighlight %}
+
 
 Our new function, `imp_update`, does have the destructive semantics we're looking for, but in order to get it we introduce the ability to reference a value by name. We do this by modeling state as a function from variable names to values (with the only values we can have being lists of integers to keep things simple). Then, instead of operating on values directly, we must read from and write to this state by specifying the referred variable's name - in this case `a`. It's worth calling out that in `write_state`, the syntax `s(var := l)` is actually creating a new function that has all the same mappings as `s` except with `var` now mapped to `l`. Isabelle/HOL allows us to manipulate functions in the true mathematical sense where they are just sets (of ordered pairs), and in that way they are the reasoning analog of hash tables.
 
@@ -92,7 +95,7 @@ int main() {
 
 and here's is the assembly code (ARM) that results from compiling[^fn3] it:
 
-<pre>
+<pre style="font-size: 0.85em; padding: 10px">
 	.section	__TEXT,__text,regular,pure_instructions
 	.build_version macos, 11, 0
 	.globl	_main                           ; -- Begin function main
@@ -187,7 +190,8 @@ The behavior of `update_arr` is very simple: it is correct if the passed in arra
 
 Let's pull it into Isabelle for reasoning:
 
-```
+{% highlight plaintext %}
+
 theory ImperativeReasoning
 
 imports AutoCorres.AutoCorres
@@ -210,19 +214,21 @@ theorem
   apply(wp)
   apply(auto simp: fun_upd_def)
   done
-```
+{% endhighlight %}
+
 
 There's actually quite a bit going on in this short example, so let's unpack it. First, this is using [AutoCorres](https://github.com/seL4/l4v/blob/master/tools/autocorres/README.md), which is a tool for reasoning about C code via an Isabelle/HOL representation. The `install_C_file` and `autocorres` commands parse and translate the C code of our example, with `autocorres` performing several abstractions and optimizations to the code that greatly simplifies reasoning about it in Isabelle. For what we're talking about, the most relevant abstraction is that the concept of a _heap_ is added to the translated C code. The heap is a model of the underlying memory that the C program interacts with via pointers, arrays, mallocs, or any other memory-manipulating constructs. Because we are going to be reasoning about the program, the memory must be modeled explicitly, as we did in the functional destructive array update code. AutoCorres has a more advanced design of the heap, which you [can read more about in David Greenaway's PhD thesis](https://trustworthy.systems/publications/nicta_full_text/8758.pdf). I recommend at least reading the chapter about heap abstraction, it's pretty digestible and very informative.
 
 Next, let's unpack the theorem that we've constructed:
 
-```
+{% highlight plaintext %}
+
 theorem
   "validNF
     (λs. array_mem_valid s a ∧ s = s0)
     (update_arr' a v)
     (λ_ s. (array_mem_valid s a) ∧ s = s0[(ptr_add a 1) := v])"
-```
+{% endhighlight %}
 
 In math, a theorem is just a statement that is proven to be true, and the primary way that we can reason about anything is to come up with some such statement and try and evaluate its truth or accuracy. One of the most common ways of expressing statements about an imperative program is with Hoare logic, which is what we're doing in this theorem. `validNF p c q` is a function that represents a Hoare triple, which is a specification of what a program or part of a program should do in order to be correct. It takes three arguments:
 
@@ -238,22 +244,26 @@ Finally our postcondition is: `λ_ s. (array_mem_valid s a) ∧ s = s0[(ptr_add 
 
 The "NF" in `validNF` stands for "non-failure" which means that we are also saying that, as long as the precondition is met, `update_arr'` will execute to termination with no failures, known as "total correctness." A more traditional way of representing Hoare triples is by writing: `{P}C{Q}`, and it can even be written this way in Isabelle using custom syntax rules, but we wrote it using a plain function call to show that there's no magic going on under the hood. Here are the definitions that make up `validNF`: 
 
-```
+{% highlight plaintext %}
+
 validNF P f Q ≡ valid P f Q ∧ no_fail P f
 valid P f Q ≡ ∀s. P s ⟶ (∀(r,s') ∈ fst (f s). Q r s')
 no_fail P m ≡ ∀s. P s ⟶ ¬ (snd (m s))
-```
+{% endhighlight %}
+
 
 The definitions themselves aren't exactly important for this exampe, but I'm sharing them to show that this theorem amounts to an equation, and we ultimately want to prove that the left hand and right are equivalent.
 
 To recap: we translated our actual C code into Isabelle/HOL, and then we wrote a Hoare triple which specifies what it means for `update_arr'` to be correct. If this call to `validNF` can be proven to be true, then `update_arr'` can be taken to be correct with respect to this specification. With a few proof statements, we do get Isabelle to accept this statement as proven:
 
-```
+{% highlight plaintext %}
+
 unfolding update_arr'_def and array_mem_valid_def
 apply(wp)
 apply(auto simp: fun_upd_def)
 done
-```
+{% endhighlight %}
+
 
 `AutoCorres` provides the proof tactic `wp` which converts a Hoare triple into the weakest precondition needed to be satisfied in order for the postcondition to hold, an [old trick from Djikstra](https://www.cs.utexas.edu/users/EWD/transcriptions/EWD04xx/EWD472.html) that allows us to reduce a Hoare triple into a single logical formula that we need to prove. One absolutely invaluable benefit of moving from C to higher-order logic for reasoning is that we can use functional programming with a bit of added logic on top to define the semantics of a program along with Hoare triples about it. Once we do that, we can prove all kinds of things using only term simplification, which is what the `unfolding update_arr'_def and array_mem_valid_def` and `apply(auto simp: fun_upd_def)` lines mean - the proof is literally just a transformation of the code until the left hand side of an equation exactly matches the right hand side. This is only possible because of the heap being explicitly modeled, and couldn't be done by using the imperative code directly.
 

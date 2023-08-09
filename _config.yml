@@ -31,3 +31,5 @@ plugins:
  - jekyll-feed
 
 mathjax: true
+
+highlighter: none

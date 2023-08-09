@@ -68,7 +68,8 @@ Actions are what allow an application to move through different states over time
 
 The end goal is to convert our existing [model-based test]({% post_url 2022-08-11-model-based-testing %}) into one that's more efficient and allows us to check more interesting properties. To do that, we're going to end up with something that looks like this:
 
-~~~
+{% highlight typescript %}
+
 type DeleteRecurringTransactionState = {
   recurringTransactions: RecurringTransaction[];
   id: number;
@@ -110,7 +111,7 @@ function refinementMapping(impl: Impl): Budget {
 }
 
 Deno.test("deleteRecurringTransaction", async (t) => {  
-  let state = <generate test state>;
+  let state = /*<generate test state>*/;
 
   await fc.assert(
     fc.asyncProperty(state, async (state: DeleteRecurringTransactionState) => {
@@ -141,8 +142,8 @@ Deno.test("deleteRecurringTransaction", async (t) => {
     { numRuns: 10, endOnFailure: true }
   );
 });
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 There's no way to evaluate if this is a good test or even what exactly it's testing for without understanding some theory. But all of this theory is in service of testing a real, functional single-page web application.
 
@@ -193,7 +194,8 @@ How many possible sequences of actions are there for our simple counter system? 
 
 Even though they are infinite, it's very natural to express the correctness of a model-based system in terms of action sequences using universal quantification, aka "for all" statements:
 
-```
+{% highlight plaintext %}
+
 ** Holistic correctness statement **:
 
 For all initial states 's',
@@ -202,7 +204,8 @@ For all initial states 's',
   and a top-level action function 'model':
   
   execute(impl, s, acts) = execute(model, s, acts)
-```
+{% endhighlight %}
+
 
 Less formally: no matter what sequence of actions you take in the implementation, nor what state it starts in, it should always agree with the model. The key words being "no matter what" and "always" - this should be true of all actions, in any order, from any starting state, ever. In other words, this statement is _complete_, and we'll refer to it as "the holistic correctness statement." It's important to keep this statement in mind, since **this is our definition of correctness and our end goal**, and any optimization that we do always has to tie back to it. (Note: this is also a classic way of expressing [refinement]({% post_url 2021-11-26-refinement %})).
 
@@ -222,16 +225,17 @@ Refinement mappings solve problems 1 and 3, and somewhat magically still also im
 
 A refinement mapping is just a function with a couple of special rules, some of which are out of scope for this post. The first rule is that the function is from the implementation state to the model state, e.g. in our preview of the budget app test we can see that the refinement mapping maps the `Impl` implementation state type to the `Budget` model type:
 
-~~~
+{% highlight typescript %}
+
 function refinementMapping(impl: Impl): Budget {
   ...
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 The goal here is to be able to compare the implementation to the model, and if they have different state types we need to translate states in the implementation's state space to ones in the model's. On top of this, the most relevant other rule for a valid refinement mapping is that, for all implementation states and actions, the action is equivalent to the model action with the refinement mapping applied in the appropriate places. In logic pseudocode:
 
-```
+{% highlight plaintext %}
 ** Correctness via Refinement Mapping ** 
 For all implementation states 's',
   all implementation actions 'impl',
@@ -239,13 +243,15 @@ For all implementation states 's',
   and a refinement mapping 'rm':
 
   rm(impl(s)) = model(rm(s))
-```
+{% endhighlight %}
+
 
 The intuition for why it works is that, if every single-step action in the implementation agrees with the same action taken in the model, then chaining multiple actions into sequences should preserve that equivalence. This is an example of an inductive argument. The refinement mapping function can be defined in many different ways depending on how we want to relate the two state types, which gives our new correctness statement an important caveat: we consider the system correct _under the provided refinement mapping_. This is the price we pay for dealing with state incompatibilities.
 
 In our budget app test, the refinement mapping is defined as follows:
 
-~~~
+{% highlight typescript %}
+
 function refinementMapping(impl: Impl): Budget {
   let budget = new Budget();
   budget.error = impl.client.error;
@@ -255,8 +261,8 @@ function refinementMapping(impl: Impl): Budget {
 
   return budget;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 The `Impl` implementation type has both database (`impl.db`) and client states (`impl.client`), reflecting the independent states in a client-server application. In this system, only recurring transactions are persisted, and scheduled transactions are derived data. Because of this, the implementation's recurring transactions in the database map to the model's recurring transactions, whereas the implementation's scheduled transactions in the client map to the model's scheduled transactions. Any error in the client maps to an error in the model. Notably, this is talking about _system_ errors, i.e. errors / results in the domain logic. The model has no notion of networking, so networking errors can be stored separately, but they don't map to any model state[^fn3].
 
@@ -324,7 +330,8 @@ function translateOnlyX(x: number, delta: number): number {
 
 In the model-based testing context, instead of comparing the functions at the global state level (`Point` in this case), we can compare the actions at the local level:
 
-```
+{% highlight plaintext %}
+
 ** Local Refinement Mapping Correctness Statement **
 
 For all action functions 'impl',
@@ -333,30 +340,33 @@ For all action functions 'impl',
   and a refinement mapping 'rm':
   
   rm(impl(ls)) = model(rm(ls))
-```
+{% endhighlight %}
+
 
 Breaking out the action implementation in this way has no behavioral effect on the global-level `translateX` function, since `translateX` can easily be implemented in terms of `translateOnlyX`:
 
-~~~
+{% highlight typescript %}
+
 function translateX(point: Point, delta: number): Point {
   const result = { ...point };
   result.x = translateOnlyX(result.x, delta);
 
   return result;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 And this is exactly what's going on in our upgraded budget test. In our excerpt, we're only focusing on the `deleteRecurringTransaction` action, and we generate a test state specific to this action:
 
-~~~
+{% highlight typescript %}
+
 type DeleteRecurringTransactionState = {
   recurringTransactions: RecurringTransaction[];
   id: number;
   db: DBState;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 Deleting a recurring transaction doesn't interact in any way with the `scheduledTransactions` state variable in that application, so we can leave that out of the test state for this particular action.
 
@@ -384,7 +394,8 @@ Again, there are a few different ways to approach either allowing or disallowing
 
 Well, one solution to that is to add a separate model instance as an auxiliary variable to the implementation which tracks the source of truth of the state of the client alone. Then, whenever a write occurs, we double-write to the implementation and this client model. Again, there are many patterns for doing this, but I like wrapping the implementation (`Client` here) in a new class with the same interface that forwards actions to the relevant members, this way the structure of the test doesn't have to change and we keep all of the auxiliary variables in test-specific code:
 
-~~~
+{% highlight typescript %}
+
 class Impl {
   db: DBState;
   client: Client;
@@ -404,12 +415,13 @@ class Impl {
 
   ...
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 In the test excerpt, we see another assertion named `checkImplActionProperties`[^fn4], and its defintion will now make sense:
 
-~~~
+{% highlight typescript %}
+
 async function checkImplActionProperties(impl: Impl, t: Deno.TestContext) {
   await t.step("loading is complete", () => assertEquals(impl.client.loading, false));
 
@@ -417,8 +429,8 @@ async function checkImplActionProperties(impl: Impl, t: Deno.TestContext) {
     () => assertEquals(impl.client.recurringTransactions, impl.aux.clientModel.recurringTransactions)
   );
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 After each action has been invoked, we check that the actual state of the client matches the state of the _client_ model, not the system model which is only aware of the database state. We also check that the loading variable in the client is false for good measure, ensuring that any spinners or other loading UI are hidden at the end of every action.
 

@@ -24,12 +24,11 @@ It is simply something we have to acknowledge about the end goal of testing and 
 
 We will look at a more realistic example next, but let's first consider a more illustrative one. A very commonly cited example of misspecification is for a `sort` function:
 
-~~~
+{% highlight typescript %}
 function sort(array: number[]): number[] {
   // ... 
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 `sort` should:
 - accept an array of numbers
@@ -60,7 +59,8 @@ Stated informally, the specification is something along the lines of:
 
 Here's a formal specification of this behavior:
 
-~~~
+{% highlight plaintext %}
+
 sig Customer {}
 
 abstract sig Stage {}
@@ -75,11 +75,13 @@ sig Deal {
 pred connectionExists(d: Deal) {
   some prevDeal: Deal | d.customer = prevDeal.customer and prevDeal.stage in Late
 }
-~~~
+{% endhighlight %}
+
 
 This is written in [Alloy](https://alloy.readthedocs.io/en/latest/intro.html),  which lends itself very nicely to modeling relational data models. I won't be doing an Alloy tutorial here, but this is the gist. This spec defines the data model of the app (`Customer`, `Stage`, and `Deal`), along with the logic for the `connectionExists` query. The logic of `connectionExists` can be read as: "A connection exists for a `Deal` `d` if there exists a previous `Deal`, they both have the same `Customer`, and the previous `Deal` was late stage. We could implement this with the following code:
 
-~~~
+{% highlight typescript %}
+
 const alasql = require("alasql");
 
 type Stage = "early" | "late";
@@ -105,12 +107,13 @@ function CreateDeal(deal: Deal, db): Deal {
 
     return deal;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 [`alasql`](https://github.com/agershun/alasql) is an in-memory SQL database that, among other things, makes examples like these easy to write. If we were to play around with this for a bit, we would notice a bug. But it's not an implementation bug - it's a _design_ bug, a bug in our actual algorithm for implementing the requirements. Consider the following test case:
 
-~~~
+{% highlight typescript %}
+
 function initDatabase() {
     let database = new alasql.Database();
     database.exec(
@@ -130,8 +133,8 @@ function testOnlyNewDealLateStage() {
 
     return connectionExists == false;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 Here, we only create one late stage deal, and our logic reports that a connection exists for it. Remember - the point of a connection is to alert someone when there is a _previously existing_ deal with their new customer. That implies that more than one Deal must exist for `ConnectionExists` to ever return true.
 
@@ -139,17 +142,20 @@ Our implementation was perfectly fine, but our behavior was misspecified.
 
 Here's the fix, first in the spec:
 
-~~~
+{% highlight plaintext %}
+
 pred connectionExists(d: Deal) {
   let ExistingDeals = Deal - d |
     some prevDeal: ExistingDeals | 
       d.customer = prevDeal.customer and prevDeal.stage in Late
 }
-~~~
+{% endhighlight %}
+
 
 Instead of querying for the connected deals in the set of all Deals (which `Deal` represents), we query all Deals other than the one whose connections we're looking for: `ExistingDeals = Deal - d`. The new implementation would be:
 
-~~~
+{% highlight typescript %}
+
 function ConnectionExists(d: Deal, db: any): boolean {
     const connectedDeals: Deal[] = db.exec(
         "SELECT * FROM deals WHERE customer = ? and stage = 'late' and id != d.id",
@@ -158,8 +164,8 @@ function ConnectionExists(d: Deal, db: any): boolean {
 
     return connectedDeals.length > 0;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 What we witnessed here was a misspecification. If we look back at the informal description of the feature, notice how it says "...if another Deal." In retrospect it's pretty clear that we should subtract the subject Deal from the rest of the existing Deals in the system when looking for connections. But that subtle fact was not captured in our first version of the specification, because formally capturing subtlety is hard! There is a quote from Dick Guindon:
 
@@ -185,7 +191,8 @@ I love how [Andrew Helwer puts it](https://ahelwer.ca/post/2018-02-12-formal-ver
 
 Consider the following proposed property of our spec:
 
-~~~
+{% highlight plaintext %}
+
 pred connectionExists(d: Deal, Deals: set Deal) {
   let ExistingDeals = Deals - d |
     some prevDeal: ExistingDeals |
@@ -199,13 +206,14 @@ assert oppositeStagesRemainConnected {
     d'.stage != d.stage implies 
       connectionExists[d, Deal - d'] implies connectionExists[d', Deal - d]
 }
-~~~
+{% endhighlight %}
+
 
 This says approximately: "For all combinations of 3 different Deals with the same Customer, if 2 of the Deals have opposite stages and one of those has a connection, then so does the other." To express this property, we modify `connectionExists` to take in the set of Deals to check a connection within. This isn't an obvious property by any means[^fn1], but it does arise after thinking about the general reason behind our previous design bug. The bug occurred because we improperly reported a connection only for a Late Stage Deal, so it makes sense to come up with a property that relates Deals with different Stages.
 
 Using properties in this way is much, much more robust than test cases, because properties are general. For example, here's the test case we wrote after we encountered the previous bug: 
 
-~~~
+{% highlight typescript %}
 function testOnlyNewDealLateStage() {
     let db = initDatabase();
 
@@ -215,16 +223,17 @@ function testOnlyNewDealLateStage() {
 
     return connectionExists == false;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 This test case transcribes the literal scenario where we encountered the bug, so the focus is (as is usual with example-based testing) on a specific scenario. We might have tried to change the implementation to this at first:
 
-~~~
+{% highlight typescript %}
 pred connectionExists(d: Deal, Deals: set Deal) {
   #{prevDeal: Deals | d.customer = prevDeal.customer and prevDeal.stage in Late } > 1
 }
-~~~
+{% endhighlight %}
+
 
 Instead of checking for the existence of a single Deal, we check for more than one Deal. We know this isn't correct logic now, but it's not always so obvious in the moment, and it's a common programming reflex to think we have an off-by-one error and just increase the count. This test case does not fail for this new logic though! That's a really common problem with test suites - even with tons and tons of test cases, they don't actually get at the essence of the requirements. We can look at a test suite as providing an implicit specification, and a missing test case is equivalent to a misspecification.
 
@@ -240,7 +249,8 @@ It generated 2 Deals with different Stages that should have connections but don'
 
 Here's the full specification plus property check at this point:
 
-~~~
+{% highlight plaintext %}
+
 sig Customer {}
 
 abstract sig Stage {}
@@ -267,7 +277,8 @@ assert oppositeStageDealsRemainConnected {
 }
  
 check oppositeStageDealsRemainConnected for 5
-~~~
+{% endhighlight %}
+
 
 It's not like this took thousands of lines of test setup code and hundreds of minutes of test time in CI. Specifications plus properties plus model checking have a great cost-to-benefit ratio, with the main benefit being that we get more confidence that we're avoiding a misspecification as we check properties that we feel accurately describe our problem.
 

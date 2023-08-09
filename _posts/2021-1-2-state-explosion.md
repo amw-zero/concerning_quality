@@ -19,18 +19,17 @@ program is fraught with danger.[^fn1]
 
 When we think of edge cases, we intuitively think of branches in the code. Take the following trivial example:
 
-~~~
+{% highlight typescript %}
 if (currentUser) {
   return "User is authenticated";
 } else {
   return "User is unauthenticated";
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 This single `if` statement has only two branches[^fn2]. If we wanted to test it, we surely need to exercise both and verify that the correct string is returned. I don't think anyone would have difficulty here, but what if the condition is more complicated?
 
-~~~
+{% highlight typescript %}
 function canAccess(user) {
   if (user.internal === false || user.featureEnabled === true) {
     return true;
@@ -38,12 +37,11 @@ function canAccess(user) {
     return false;
   }
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 Here, we could have come up with the following test cases:
 
-~~~
+{% highlight typescript %}
 let user = {
   internal: false,
   featureEnabled: false,
@@ -57,14 +55,13 @@ let user = {
 };
 
 canAccess(user); // ==> true
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 This would yield 100% branch coverage, but there's a subtle bug. The `internal` flag was supposed to give internal users access to some feature without needing the feature to be explicitly flagged (i.e. `featureEnabled: true`), but the conditional checks for `user.internal === false` instead. This would give access to the feature to all external users, whether or not they had the flag enabled. This is why bugs exist even with 100% branch coverage. While it is useful to know if you have missed a branch during testing, knowing that you've tested all branches still does not guarantee that that the code works for all possible inputs.
 
 For this reason, there are more comprehensive (and tedious) coverage strategies, such as condition coverage. With condition coverage you must test the case where each subcondition of a conditional evaluates to true and false. To do that here, we'd need to construct the following four `user` values (true and false for each side of the `||`):
 
-~~~
+{% highlight typescript %}
 let user = {
   internal: false,
   featureEnabled: false,
@@ -84,8 +81,7 @@ let user = {
   internal: true,
   featureEnabled: true,
 };
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 If you're familiar with Boolean or propositional logic, these are simply the input combinations of a truth table for two boolean variables:
 
@@ -98,7 +94,7 @@ If you're familiar with Boolean or propositional logic, these are simply the inp
 
 This is tractable for this silly example code because there are only 2 boolean parameters and we can exhaustively test all of their combinations with only 4 test cases. Obviously `bools` aren't the only type of values in programs though, and other types exacerbate the problem because they consist of more possible values. Consider this example:
 
-~~~
+{% highlight typescript %}
 enum Role {
   Admin,
   Read,
@@ -112,39 +108,35 @@ function canAccess(role: Role) {
     return false;
   }
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 Here, a role of `Admin` or `ReadWrite` should allow access to some operation, but the code only checks for a role of `ReadWrite`. 100% condition and branch coverage are achieved with 2 test cases (`Role.ReadWrite` and `Role.Read`), but the function returns the wrong value for `Role.Admin`. This is a very common bug with enum types -- even if exhaustive case matching is enforced, there's nothing that prevents us from writing an improper mapping in the logic.
 
 The implications of this are very bad, because data combinations grow combinatorially. If we have a `User` type that looks like this,
 
-~~~
+{% highlight typescript %}
 type User = {
   role: Role,
   internal: Boolean,
   flagEnabled: Boolean
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 and we know that there are 3 possible `Role` values and 2 possible `Boolean` values, there are then 3 * 2 * 2 = 12 possible `User` values that we can construct. The set of possible states that a data type can be in is referred to as its state space. A state space of size 12 isn't so bad, but these multiplications get out of hand very quickly for real-world data models. If we have a `Resource` type that holds the list of `Users` that have access to it,
 
-~~~
+{% highlight typescript %}
 type Resource = {
   users: User[]
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 it has 4,096 possible states (2^12 elements in the power set of `Users`) in its state space. Let's say we have a function that operates on two `Resources`:
 
-~~~
+{% highlight typescript %}
 function compareResources(resource1: Resource, resource2: Resource) { 
   ...
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
 
 The size of the domain of this function is the size of the product of the two `Resource` state spaces, i.e. 4,096^2 = 16,777,216. That's around 16 million test cases to exhaustively test the input data. If we are doing integration testing where each test case can take 1 second, this would take ~194 days to execute. If these are unit tests running at 1 per millisecond, that's still almost 5 hours of linear test time. And that's not even considering the fact that you physically can't even write that many tests, so you'd have to generate them somehow.
 
@@ -156,7 +148,7 @@ This is the ultimate dilemma: testing with exhaustive input data is the only way
 
 We've only considered pure functions up until now. A stateful, interactive program is more complicated than a pure function. Let's consider the [following stateful React app](/assets/user-form-app), which I've chosen because it has a bug that actually occurred to me in real life[^fn4]. 
 
-~~~
+{% highlight jsx %}
 type User = {
   name: string
 }
@@ -201,13 +193,13 @@ function App() {
           {"Toggle Form"}
         </button>}
       {showingUserForm && (
-        <UserForm users={users} onSearch={setUsers}/>
+        <UserForm users={users} onSearch={setUsers}></UserForm>
       )}
     </div>
   );
 }
-~~~
-{: .language-jsx}
+{% endhighlight %}
+
 
 This app can show and hide a form that allows selecting a set of `Users`. It starts out by showing all `Users` but also allows you to search for specific ones. There's a tiny (but illustrative) bug in this code. Take a minute to try and find it.
 

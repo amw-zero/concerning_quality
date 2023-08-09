@@ -25,7 +25,8 @@ Model-based testing instead encourages us to create a high level model of our sy
 
 We'll talk about each of those in turn, but first let's get right into the modeling. We're going to build a personal finance application for tracking our recurring bills. All of the code referenced in this post is [available here](https://github.com/amw-zero/personal_finance_funcorrect).
 
-~~~
+{% highlight typescript %}
+
 export class Budget {
   recurringTransactions: RecurringTransaction[] = [];
   scheduledTransactions: ScheduledTransaction[] = [];
@@ -65,8 +66,8 @@ export class Budget {
   }
 }
 
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 First thing's first: we wrote our model in Typescript. There are many ways of creating model specifications with separate specification languages like TLA+ or Alloy, but in the Amazon paper above they went with implementing the model in the same language as the implementation. This makes writing the functional correctness test a lot simpler, as it can just reference the model and implementation directly.
 
@@ -86,7 +87,8 @@ To test for "all" cases, we'll use the [model-based testing capabilities of fast
 
 First we create a command object that runs the same action in both the model and the implementation:
 
-~~~
+{% highlight typescript %}
+
 class AddRecurringTransactionCommand implements fc.AsyncCommand<Budget, Client> {
   constructor(readonly crt: CreateRecurringTransaction) {}
   check = (m: Readonly<Budget>) => true;
@@ -96,8 +98,8 @@ class AddRecurringTransactionCommand implements fc.AsyncCommand<Budget, Client> 
   }
   toString = () => `addRecurringTransaction`;
 }
-~~~
-{: .language-typescript}
+{% endhighlight %}
+
 
 Each command gets passed a `Budget` instance which we defined in the model, as well as the `Client` instance. We create similar command objects for the other system actions, and then we can wire them up into the full test. The test creates an array, `allCommands`, which holds all of these possible actions, and it uses `fast-check's` data generators to create the input data for each of the actions. `fast-check` takes in this array of commands and executes random sequences of them, and after each sequence is complete we can run some assertions that check that the model and implementation states are equal.
 

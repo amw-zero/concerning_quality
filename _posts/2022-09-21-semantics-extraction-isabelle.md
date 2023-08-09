@@ -97,7 +97,8 @@ That brings us to the final step, where we'll parse source code and evaluate it 
 
 Here's a quick lexer (using `ocamllex`):
 
-```
+{% highlight plaintext %}
+
 {
   open Lexing
   open Parser
@@ -118,11 +119,13 @@ rule read = parse
   | ')'               { RPAREN }
   | _                 { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof               { EOF }
-```
+{% endhighlight %}
+
 
 And the corresponding parser (using `menhir`):
 
-```
+{% highlight plaintext %}
+
 %{
 open Core.BoolExp
 %}
@@ -154,7 +157,8 @@ expression:
   | IF e1 = expression THEN e2 = expression ELSE e3 = expression 
                                   { BIf(e1, e2, e3) }
   | LPAREN e = expression RPAREN  { e }
-```
+{% endhighlight %}
+
 
 Note that in between curly braces we're creating OCaml values that correspond to our `boolexp` AST defined in Isabelle. This is the step where we go from a piece of source code to a piece of structured syntax that our executable semantics can actually execute.
 

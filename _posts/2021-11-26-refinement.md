@@ -103,7 +103,7 @@ Refinement is a whole field unto itself, with the main theory being laid out in 
 
 There are many ways to prove refinement between two programs, but the simplest to understand is equality - if two programs result in the exact same value for all possible inputs, then one can be seen to refine the other. Let's call our more abstract method for placing orders `place_order`, and let's call our version that uses a server `place_order_http`. In Isabelle/HOL, which for the most part resembles other functional programming languages, we would express equality of the two functions as a theorem:
 
-{% highlight isabelle %}
+{% highlight plaintext %}
 theorem "place_order_http orders order = place_order orders order"
 {% endhighlight %}
 
@@ -111,7 +111,7 @@ theorem "place_order_http orders order = place_order orders order"
 
 Let's first introduce the abstract implementation:
 
-{% highlight isabelle %}
+{% highlight plaintext %}
 record order =
   amount :: nat
 
@@ -125,7 +125,7 @@ We introduce the `order` type as a record with just an `amount` field for simpli
 
 Let's now introduce the version that calls to a server, serializing before the call and deserializing after. Note - we implement the serialization and deserialization of the number here to illustrate that we need to know about these implementations to complete the proof:
 
-{% highlight isabelle %}
+{% highlight plaintext %}
 type_synonym http_data = string
 
 fun digit_list :: "nat ⇒ nat list" where
@@ -156,7 +156,7 @@ Now, we have both `place_order` and `place_order_http` defined. Aside from the i
 
 Now, here is the proof for our desired theorem, using an intermediate lemma: 
 
-{% highlight isabelle %}
+{% highlight plaintext %}
 lemma ser_deser[simp]: "nat_of_string (string_of_nat n) = n"
   apply(induction n rule: digit_list.induct)
    apply(auto simp: string_of_nat_def)
@@ -174,7 +174,7 @@ More importantly (for the topic of this post) is that we now have the simpler `p
 
 Here's the full example:
 
-{% highlight isabelle %}
+{% highlight plaintext %}
 record order =
   amount :: nat
 
