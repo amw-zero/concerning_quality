@@ -33,6 +33,10 @@
   <a href="{{ "/" | relative_url }}" class="title">{{ site.title | escape }}</a>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/intellij-light.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script type="module">
+    import sligh from '/assets/highlight/sligh.js';
+    hljs.registerLanguage('sligh', sligh);
+  </script>
   <script>hljs.highlightAll();</script>
   {% include menu.html menu=pages %}
 </header>
