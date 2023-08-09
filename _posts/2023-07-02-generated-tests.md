@@ -14,26 +14,16 @@ What are we even trying to do with testing? The end goal is to show correctness.
 
 First we have to define what a program is. The simplest representation is just a function from values in X to values in Y. This may look oversimplified, but an interactive program can even be modeled this way by assuming the program function is invoked in response to each user interaction in a loop. So a program P is:
 
-{% highlight plaintext %}
 
-P: X -> Y
-
-{% endhighlight %}
+$$ P: X \rightarrow Y $$
 
 Correctness requires a specification to check against. This might be surprising, since one rarely exists, but think of traditional test suites as simply defining this specification point-wise. A specification S can be a function of the same type:
 
-{% highlight plaintext %}
-S: X -> Y
-{% endhighlight %}
+$$ S: X \rightarrow Y $$
 
 We can express correctness with the following property:
 
-{% highlight plaintext %}
-
-∀x ∈ X: P(x) = S(x)
-
-{% endhighlight %}
-
+$$ \forall x \in X: P(x) = S(x) $$
 
 In English: for every x value in X, evaluating P(x) yields the same value as evaluating S(x).
 
@@ -47,19 +37,15 @@ As I mentioned, the traditional test pyramid is talking about hand-written test 
 
 The next issue is the number of values in the input domain X. Each test case needs to specify a single input value from X, but testing for all values from X is not feasible in any way. This is not an exaggeration - if X is the set of single 64-bit integers, we'd have to check 18,446,744,073,709,551,616 test cases. This multiplies for each additional integer, and how many integers do you think are in the entire state of a realistic program? We said earlier that a test suite only approximates correctness, but this makes it more formal. A test suite actually represents this property:
 
-{% highlight plaintext %}
-TX ⊂ X
-∀tx ∈ TX: P(tx) = S(tx)
 
-{% endhighlight %}
+$$ TX \cup X \land \forall tx \in TX: P(tx) = S(tx) $$
+
 
 How effective a test suite is boils down to how confident we are that testing the input values that we chose implies that the correctness will hold for all of the input values, i.e.
 
-{% highlight plaintext %}
 
-∀tx ∈ TX: P(tx) = S(tx) => ∀x ∈ X: P(x) = S(x)
+$$\forall tx \in TX: P(tx) = S(tx) \implies \forall x \in X: P(x) = S(x)$$
 
-{% endhighlight %}
 
 This is probably true sometimes, but we have no guarantee of it in general. How can we ever know that the values that we pick out of X are "good enough"?
 
