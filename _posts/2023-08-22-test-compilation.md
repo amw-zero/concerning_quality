@@ -135,7 +135,7 @@ For example, in the `Increment` action, we know that the `counters` state variab
 
 Sligh processes also support nested `def`s which define system _actions_. System actions are the atomic ways that the system state can change, like adding or incrementing counters. For those conceptual user operations, we have corresponding `CreateCounter`, and `Increment` actions. This is what Sligh uses to determine which operations to generate tests for.
 
-These syntactic restrictions lead to a very powerful semantic model of a system that's also statically analyzable - they effectively lead to a DSL for describing state machines.
+These syntactic restrictions lead to a very powerful semantic model of a system that's also statically analyzable - they effectively form a DSL for describing state machines.
 
 # Compiling the Test Suite
 
