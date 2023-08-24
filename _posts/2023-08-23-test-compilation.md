@@ -16,7 +16,7 @@ certc source.cc -o myprogram -p proof
 
 `certc` compiles the source file into an executable, like every other compiler, but in addition it outputs this `proof` file. Imagine that you can open up this file, and from its contents be convinced that the compilation run contained zero bugs, and the output `myprogram` is a perfect translation of `source.cc`[^fn2]. The compilation run is _certified_ by this proof. Such compilers are sometimes referred to as _self-certifying_ for this reason - they produce their own proof of correctness.
 
-We know that proofs are hard though, and for most of us a test is totally sufficient in place of a proof. So what if instead, we had this worklow:
+We know that proofs are hard though, and for most of us tests are sufficient. So what if instead, we had this workflow:
 
 ```plaintext
 certc source.cc -o myprogram -t test
