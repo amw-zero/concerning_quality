@@ -147,7 +147,7 @@ sligh counter.sl -w witness
 
 which generates a "witness" file. This is a good time to talk a bit about the compiler internals and why that is.
 
-It's common for certifying compilers to decouple per-program generated output from a separate checker that's written once. This makes the code generation phase of the compiler simpler, but also allows the checker to be written and audited independently. This is extra important since the checker is our definition of correctness for the whole application, and a misstatement there affects the guarantees our certification test gives us.
+It's common for certifying compilers to decouple per-program generated output from a separate checker[^fn4] that's written once. This makes the code generation phase of the compiler simpler, but also allows the checker to be written and audited independently. This is extra important since the checker is our definition of correctness for the whole application, and a misstatement there affects the guarantees our certification test gives us.
 
 Here's the current checker that's in use:
 
@@ -401,4 +401,6 @@ And lastly, I have to call out the awesome [Cogent](https://cogent.readthedocs.i
 [^fn2]: Any compiler-writer will tell you, compilers are [just as buggy](https://softwareengineering.stackexchange.com/a/53069) as other programs. This is why certifying compilation exists in the first place - to provide higher assurance about the correctness of a compiler.
 
 [^fn3]: I once read [an interesting take about building embedded DSLs inside of an existing language](https://matklad.github.io/2021/02/14/for-the-love-of-macros.html#Domain-Specific-Languages) that influenced my thinking here. The takeaway: eDSLs are often not worth it.
+
+[^fn4]: [Certifying Algorithms](https://people.mpi-inf.mpg.de/~mehlhorn/ftp/CertifyingAlgorithms.pdf) by R. M. McConnella, K. Mehlhornb, S. Näherc, P. Schweitzer
 
