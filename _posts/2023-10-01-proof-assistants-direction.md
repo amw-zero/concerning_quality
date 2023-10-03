@@ -70,7 +70,7 @@ lemma
 
 Here, instead of `frule_tac`, we use `rule_tac`, which applies a rule in a backward fashion. Instead of going from top to bottom in the rule, we replace the current proof goal with the premises in the top of the rule. This allows us to prove each one separately, which is one of the main benefits of backward rule application: we can more easily divide and conquer a complicated proof.
 
-It works because an inference rule can be interpreted in two ways. As we said, the forward interpretation is: "we can conclude the bottom of the top premises are true." The backward interpretation is: "to prove the bottom, it suffices to prove the top premises." These are logically equivalent.
+It works because an inference rule can be interpreted in two ways. As we said, the forward interpretation is: "we can conclude the bottom if the top premises are true." The backward interpretation is: "to prove the bottom, it suffices to prove the top premises." These are logically equivalent.
 
 To dive in a bit more, we can look at the proof state after each step in the proof above. At the beginning of the proof, the goal is simply the final conclusion we want to show:
 
