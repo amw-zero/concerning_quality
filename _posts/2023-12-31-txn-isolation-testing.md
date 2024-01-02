@@ -83,7 +83,7 @@ async function writeTransaction() {
 await Promise.allSettled([readTransaction(), writeTransaction()]);
 ```
 
-This script executes two transaction concurrently: one that reads the `txn_iso.ival` column two different times, and another which modifies the value of that column. There's some sleeps sprinkled in so that the second read occurs after the write. The question is: do both reads return the same value?
+This script executes two transactions concurrently: one that reads the `txn_iso.ival` column two different times, and another which modifies the value of that column. There's some sleeps sprinkled in so that the second read occurs after the write. The question is: do both reads return the same value?
 
 In Postgres, with the default transaction isolation level set, the answer is surprisingly no. This is an example output of running the script:
 
