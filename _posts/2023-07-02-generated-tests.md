@@ -38,7 +38,7 @@ As I mentioned, the traditional test pyramid is talking about hand-written test 
 The next issue is the number of values in the input domain X. Each test case needs to specify a single input value from X, but testing for all values from X is not feasible in any way. This is not an exaggeration - if X is the set of single 64-bit integers, we'd have to check 18,446,744,073,709,551,616 test cases. This multiplies for each additional integer, and how many integers do you think are in the entire state of a realistic program? We said earlier that a test suite only approximates correctness, but this makes it more formal. A test suite actually represents this property:
 
 
-$$ TX \cup X \land \forall tx \in TX: P(tx) = S(tx) $$
+$$ TX \subseteq X \land \forall tx \in TX: P(tx) = S(tx) $$
 
 
 How effective a test suite is boils down to how confident we are that testing the input values that we chose implies that the correctness will hold for all of the input values, i.e.
