@@ -17,35 +17,35 @@ Let's look at a concrete example. Here's a model of an authentication system, th
 
 ```typescript
 type User = {
-    id: number;
-    username: string;
-    password: string;
+  id: number;
+  username: string;
+  password: string;
 }
 
 type CreateUser = {
-    username: string;
-    password: string;
+  username: string;
+  password: string;
 }
 
 type AuthError = 'username_exists';
 
 class Auth {
-    users: User[] = [];
-    error: AuthError | null = null;
+  users: User[] = [];
+  error: AuthError | null = null;
 
-    createUser(toCreate: CreateUser) {
-        if (this.users.some(u => u.username === toCreate.username)) {
-            this.error = 'username_exists';
-            return;
-        }
-
-        const user: User = {
-            username: toCreate.username,
-            password: toCreate.password
-        }
-
-        this.users.push(user);
+  createUser(toCreate: CreateUser) {
+    if (this.users.some(u => u.username === toCreate.username)) {
+      this.error = 'username_exists';
+      return;
     }
+
+    const user: User = {
+      username: toCreate.username,
+      password: toCreate.password
+    }
+
+    this.users.push(user);
+  }
 }
 ```
 
@@ -89,24 +89,24 @@ interface AuthServer {
 }
 
 class AuthClient {
-    users: User[] = [];
-    server: AuthServer;
-    error: string | null = null;
+  users: User[] = [];
+  server: AuthServer;
+  error: string | null = null;
 
-    constructor(server: AuthServer) {
-      this.server = server;
-    }
+  constructor(server: AuthServer) {
+    this.server = server;
+  }
 
-    createUser(toCreate: CreateUser) {
-      const resp = this.server.createUser(toCreate);
-      if (resp === 'timeout') {
-        this.error = 'There was a problem creating the user. Please try again or contact support.';
-      } else if (resp === 'username_exists') {
-        this.error = 'That username is already taken. Please choose another.';
-      } else {
-        this.users.push(resp);
-      }
+  createUser(toCreate: CreateUser) {
+    const resp = this.server.createUser(toCreate);
+    if (resp === 'timeout') {
+      this.error = 'There was a problem creating the user. Please try again or contact support.';
+    } else if (resp === 'username_exists') {
+      this.error = 'That username is already taken. Please choose another.';
+    } else {
+      this.users.push(resp);
     }
+  }
 }
 
 // test file:
